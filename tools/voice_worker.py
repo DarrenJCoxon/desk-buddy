@@ -346,11 +346,12 @@ class VoiceCoordinator:
             return fut.result(timeout=300)
         return self._run_cli_turn(prompt)
 
-    def _append_history(self, transcript: str, reply: str, error: str = "") -> None:
+    def _append_history(self, transcript: str, reply: str, error: str = "", mode: str = "agent") -> None:
         p = os.path.join(HOME, "voice_history.jsonl")
         entry = {
             "ts": time.time(),
             "session_id": self.session_id,
+            "mode": mode,
             "transcript": transcript,
             "reply": reply,
             "error": error,
@@ -670,6 +671,8 @@ class VoiceHandler(http.server.BaseHTTPRequestHandler):
                 with coord.lock:
                     if text:
                         coord.last_transcript = text
+                if text:
+                    coord._append_history(text, "", mode="dictate")
                 coord.set_state("idle")
                 self._reply(200, json.dumps({"text": text}).encode("utf-8"))
             except Exception as e:
@@ -758,6 +761,14 @@ class VoiceHandler(http.server.BaseHTTPRequestHandler):
                 self._reply(200, b'{"ok":true}')
             except Exception as e:
                 self._reply(400, json.dumps({"error": str(e)}).encode("utf-8"))
+        elif self.path == "/api/voice/clear":
+            try:
+                hp = os.path.join(HOME, "voice_history.jsonl")
+                if os.path.isfile(hp):
+                    os.unlink(hp)
+                self._reply(200, b'{"ok":true}')
+            except Exception as e:
+                self._reply(500, json.dumps({"error": str(e)}).encode("utf-8"))
         elif self.path == "/api/colour":
             try:
                 data = json.loads(body.decode("utf-8") or "{}")

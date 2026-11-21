@@ -6,359 +6,257 @@
 <title>Lump — Nerve Centre</title>
 <style>
   :root {
+    --bg: #f5f7fb;
+    --bg-grad-1: rgba(66, 133, 244, 0.08);
+    --bg-grad-2: rgba(168, 85, 247, 0.06);
+    --panel: #ffffff;
+    --panel-subtle: #f8fafc;
+    --panel-hover: #f1f5f9;
+    --border: rgba(15, 23, 42, 0.09);
+    --text: #0f172a;
+    --muted: #64748b;
+    --accent: #2563eb;
+    --shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+    --code-bg: #f8fafc;
+    --code-text: #334155;
+    --warn-bg: #fffbeb;
+    --warn-border: #fde68a;
+    --warn-text: #92400e;
+    --pill-bg: #eff6ff;
+    --pill-text: #1d4ed8;
+    --pill-border: #bfdbfe;
+    --radius: 18px;
+  }
+  [data-theme="dark"] {
     --bg: #080b12;
-    --panel: rgba(17, 23, 36, 0.78);
-    --panel-hover: rgba(24, 33, 52, 0.88);
+    --bg-grad-1: rgba(66, 133, 244, 0.16);
+    --bg-grad-2: rgba(168, 85, 247, 0.12);
+    --panel: rgba(17, 23, 36, 0.82);
+    --panel-subtle: rgba(255, 255, 255, 0.035);
+    --panel-hover: rgba(255, 255, 255, 0.07);
     --border: rgba(255, 255, 255, 0.09);
     --text: #eef2ff;
     --muted: #8b97b3;
     --accent: #4285f4;
-    --green: #2dd4bf;
-    --purple: #a855f7;
-    --amber: #f59e0b;
-    --red: #f43f5e;
-    --radius: 18px;
+    --shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    --code-bg: rgba(0, 0, 0, 0.28);
+    --code-text: #cbd5e1;
+    --warn-bg: rgba(245, 158, 11, 0.1);
+    --warn-border: rgba(245, 158, 11, 0.28);
+    --warn-text: #fde68a;
+    --pill-bg: rgba(66, 133, 244, 0.16);
+    --pill-text: #93c5fd;
+    --pill-border: rgba(66, 133, 244, 0.3);
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     min-height: 100vh;
     background:
-      radial-gradient(900px 500px at 12% -5%, rgba(66, 133, 244, 0.16), transparent 60%),
-      radial-gradient(700px 500px at 88% 10%, rgba(168, 85, 247, 0.12), transparent 55%),
+      radial-gradient(900px 500px at 10% -5%, var(--bg-grad-1), transparent 60%),
+      radial-gradient(700px 500px at 90% 5%, var(--bg-grad-2), transparent 55%),
       var(--bg);
     color: var(--text);
     font: 14px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  .shell {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 24px 24px 48px;
-  }
+  .shell { max-width: 1280px; margin: 0 auto; padding: 22px 24px 48px; }
   .topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 22px;
-    flex-wrap: wrap;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px; margin-bottom: 18px; flex-wrap: wrap;
   }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-  .brand h1 {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-  .brand .sub {
-    font-size: 12.5px;
-    color: var(--muted);
-  }
+  .brand h1 { margin: 0; font-size: 22px; font-weight: 750; letter-spacing: -0.02em; }
+  .brand .sub { font-size: 12.5px; color: var(--muted); }
+  .top-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .clock {
-    font-size: 13px;
-    color: var(--muted);
-    background: var(--panel);
-    border: 1px solid var(--border);
-    padding: 7px 14px;
-    border-radius: 999px;
+    font-size: 12.5px; color: var(--muted); background: var(--panel);
+    border: 1px solid var(--border); padding: 7px 13px; border-radius: 999px;
+    box-shadow: var(--shadow);
   }
-  .grid {
-    display: grid;
-    grid-template-columns: 320px 1fr 340px;
-    gap: 18px;
-    align-items: start;
+  .live-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: #10b981; margin-right: 6px; vertical-align: middle;
   }
-  @media (max-width: 1080px) {
-    .grid { grid-template-columns: 1fr 1fr; }
+  .links-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .link-pill {
+    display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+    color: var(--text); background: var(--panel); border: 1px solid var(--border);
+    padding: 7px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 550;
+    box-shadow: var(--shadow); transition: background 0.15s, border-color 0.15s;
   }
-  @media (max-width: 720px) {
-    .grid { grid-template-columns: 1fr; }
+  .link-pill:hover { background: var(--panel-hover); border-color: var(--accent); }
+  .strip {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px;
   }
+  @media (max-width: 900px) { .strip { grid-template-columns: 1fr; } }
+  .stat-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow);
+  }
+  .stat-k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 650; }
+  .stat-v { font-size: 15px; font-weight: 650; margin-top: 4px; }
+  .stat-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .bar-track { height: 6px; background: var(--panel-hover); border-radius: 999px; overflow: hidden; margin-top: 8px; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, #2563eb, #9333ea); border-radius: 999px; }
+
+  .grid { display: grid; grid-template-columns: 315px 1fr 350px; gap: 18px; align-items: start; }
+  @media (max-width: 1080px) { .grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+
   .card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 18px;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow);
   }
   .card + .card { margin-top: 18px; }
-  .card-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 14px;
-    gap: 8px;
-  }
-  .card-title {
-    margin: 0;
-    font-size: 13px;
-    font-weight: 650;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--muted);
-  }
+  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 8px; }
+  .card-title { margin: 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
   .pill {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 3px 9px;
-    border-radius: 999px;
-    background: rgba(66, 133, 244, 0.16);
-    color: #93c5fd;
-    border: 1px solid rgba(66, 133, 244, 0.28);
+    font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+    background: var(--pill-bg); color: var(--pill-text); border: 1px solid var(--pill-border);
   }
-  .pill.green { background: rgba(45, 212, 191, 0.15); color: #5eead4; border-color: rgba(45, 212, 191, 0.3); }
-  .pill.purple { background: rgba(168, 85, 247, 0.18); color: #d8b4fe; border-color: rgba(168, 85, 247, 0.35); }
-  .pill.amber { background: rgba(245, 158, 11, 0.16); color: #fcd34d; border-color: rgba(245, 158, 11, 0.32); }
+  .pill.green { background: rgba(16, 185, 129, 0.12); color: #059669; border-color: rgba(16, 185, 129, 0.3); }
+  [data-theme="dark"] .pill.green { color: #5eead4; }
+  .pill.purple { background: rgba(147, 51, 234, 0.12); color: #7e22ce; border-color: rgba(147, 51, 234, 0.28); }
+  [data-theme="dark"] .pill.purple { color: #d8b4fe; }
+  .pill.err { background: rgba(244, 63, 94, 0.12); color: #e11d48; border-color: rgba(244, 63, 94, 0.28); }
 
   /* Lump Hero */
   .prism-wrap {
-    width: 100%;
-    aspect-ratio: 1;
-    max-width: 240px;
-    margin: 0 auto 14px;
-    border-radius: 26px;
-    overflow: hidden;
-    background: #000;
-    border: 1.5px solid rgba(255, 255, 255, 0.14);
-    box-shadow: 0 0 40px rgba(66, 133, 244, 0.18);
+    width: 100%; aspect-ratio: 1; max-width: 220px; margin: 0 auto 14px;
+    border-radius: 26px; overflow: hidden; background: #000;
+    border: 2px solid rgba(15, 23, 42, 0.12);
+    box-shadow: 0 10px 28px rgba(37, 99, 235, 0.18);
   }
-  .prism-wrap iframe {
-    width: 100%;
-    height: 100%;
-    border: 0;
-    display: block;
-  }
-  .swatches {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    margin-bottom: 14px;
-  }
+  .prism-wrap iframe { width: 100%; height: 100%; border: 0; display: block; }
+  .swatches { display: flex; justify-content: center; gap: 8px; margin-bottom: 14px; }
   .swatch {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.22);
-    cursor: pointer;
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid rgba(0, 0, 0, 0.12); cursor: pointer;
     transition: transform 0.12s, border-color 0.12s;
   }
-  .swatch:hover { transform: scale(1.18); border-color: #fff; }
+  .swatch:hover { transform: scale(1.18); border-color: var(--text); }
 
-  .btn-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
   button.btn {
-    appearance: none;
-    border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--text);
-    font: 600 12.5px/1.2 inherit;
-    padding: 10px 12px;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s, transform 0.08s;
+    appearance: none; border: 1px solid var(--border); background: var(--panel-subtle);
+    color: var(--text); font: 600 12.5px/1.2 inherit; padding: 9px 11px;
+    border-radius: 11px; cursor: pointer; transition: background 0.15s, border-color 0.15s;
   }
-  button.btn:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255,255,255,0.2); }
-  button.btn:active { transform: scale(0.98); }
-  button.btn.primary { background: rgba(66, 133, 244, 0.24); border-color: rgba(66, 133, 244, 0.5); color: #dbeafe; }
-  button.btn.primary:hover { background: rgba(66, 133, 244, 0.36); }
-  button.btn.danger { background: rgba(244, 63, 94, 0.22); border-color: rgba(244, 63, 94, 0.5); color: #fecdd3; }
+  button.btn:hover { background: var(--panel-hover); border-color: rgba(37, 99, 235, 0.35); }
+  button.btn.sm { padding: 5px 10px; font-size: 11.5px; border-radius: 999px; }
+  button.btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+  button.btn.primary:hover { background: #1d4ed8; }
+  button.btn.danger { background: #e11d48; border-color: #e11d48; color: #fff; }
 
-  /* Command bar */
-  .cmd-row {
-    display: flex;
-    gap: 8px;
-  }
+  .cmd-row { display: flex; gap: 8px; }
   input.field {
-    flex: 1;
-    background: rgba(0, 0, 0, 0.35);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font: 13.5px/1.3 inherit;
-    padding: 9px 12px;
-    border-radius: 11px;
-    outline: none;
+    flex: 1; background: var(--panel-subtle); border: 1px solid var(--border);
+    color: var(--text); font: 13.5px/1.3 inherit; padding: 9px 12px;
+    border-radius: 11px; outline: none; min-width: 0;
   }
-  input.field:focus { border-color: rgba(66, 133, 244, 0.65); }
+  input.field:focus { border-color: var(--accent); background: var(--panel); }
 
   /* Tasks */
   .todo-list { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 6px; }
   .todo-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 9px 11px;
-    border-radius: 11px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    cursor: pointer;
-    transition: background 0.12s;
+    display: flex; align-items: flex-start; gap: 10px; padding: 9px 11px;
+    border-radius: 11px; background: var(--panel-subtle); border: 1px solid var(--border);
+    cursor: pointer; transition: background 0.12s;
   }
-  .todo-item:hover { background: rgba(255, 255, 255, 0.065); }
+  .todo-item:hover { background: var(--panel-hover); }
   .todo-item.done span { text-decoration: line-through; color: var(--muted); }
-  .todo-item input[type=checkbox] {
-    margin-top: 3px;
-    accent-color: var(--accent);
-    width: 15px;
-    height: 15px;
-    cursor: pointer;
-  }
+  .todo-item input[type=checkbox] { margin-top: 3px; accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
   .watchouts {
-    background: rgba(245, 158, 11, 0.09);
-    border: 1px solid rgba(245, 158, 11, 0.25);
-    border-radius: 12px;
-    padding: 12px 14px;
-    margin-bottom: 14px;
-    font-size: 13px;
+    background: var(--warn-bg); border: 1px solid var(--warn-border);
+    border-radius: 12px; padding: 11px 14px; margin-bottom: 14px; font-size: 13px; color: var(--warn-text);
   }
   .watchouts ul { margin: 6px 0 0 16px; padding: 0; }
-  .watchouts li { margin-bottom: 4px; color: #fde68a; }
+  .watchouts li { margin-bottom: 4px; }
 
-  /* Calendar list */
+  /* Calendar */
   .mtg-list { display: flex; flex-direction: column; gap: 8px; }
   .mtg-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.035);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 12px; background: var(--panel-subtle); border: 1px solid var(--border);
   }
-  .mtg-title { font-weight: 600; font-size: 13.5px; }
+  .mtg-title { font-weight: 600; font-size: 13.5px; color: var(--text); text-decoration: none; }
+  a.mtg-title:hover { color: var(--accent); text-decoration: underline; }
   .mtg-time { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .mtg-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .mtg-link {
+    font-size: 11px; font-weight: 600; text-decoration: none; padding: 4px 9px;
+    border-radius: 999px; background: rgba(16, 185, 129, 0.13); color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.3); white-space: nowrap;
+  }
+  .mtg-link:hover { background: rgba(16, 185, 129, 0.22); }
+  [data-theme="dark"] .mtg-link { color: #5eead4; }
   .mtg-badge {
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-    padding: 3px 8px;
-    border-radius: 999px;
-    background: rgba(66, 133, 244, 0.14);
-    color: #93c5fd;
+    font-size: 11px; font-weight: 600; white-space: nowrap; padding: 3px 8px;
+    border-radius: 999px; background: var(--pill-bg); color: var(--pill-text);
   }
-  .mtg-badge.soon { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+  .mtg-badge.soon { background: #fef3c7; color: #b45309; }
 
-  /* Notes list */
+  /* Notes & Build Monitor */
   .note-item {
-    padding: 10px 12px;
-    border-radius: 11px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    cursor: pointer;
-    margin-bottom: 8px;
-    transition: background 0.12s;
+    padding: 10px 12px; border-radius: 11px; background: var(--panel-subtle);
+    border: 1px solid var(--border); cursor: pointer; margin-bottom: 8px; transition: background 0.12s;
   }
-  .note-item:hover { background: rgba(255, 255, 255, 0.075); }
+  .note-item:hover { background: var(--panel-hover); }
   .note-name { font-weight: 600; font-size: 13px; }
   .note-meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
-
-  .voice-item {
-    padding: 9px 11px;
-    border-radius: 10px;
-    background: rgba(255,255,255,0.03);
-    margin-bottom: 8px;
-    font-size: 12.5px;
+  .bm-pre {
+    white-space: pre-wrap; word-break: break-word;
+    font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--code-text); background: var(--code-bg);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px; margin: 0; max-height: 250px; overflow: auto;
   }
-  .voice-q { color: #bfdbfe; font-weight: 500; }
-  .voice-a { color: var(--muted); margin-top: 3px; }
+
+  /* Clean Voice Log */
+  .voice-list { display: flex; flex-direction: column; gap: 10px; }
+  .voice-entry {
+    padding: 10px 12px; border-radius: 12px; background: var(--panel-subtle);
+    border: 1px solid var(--border); font-size: 12.5px;
+    overflow-wrap: anywhere; word-break: break-word;
+  }
+  .voice-meta {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 5px; font-size: 11px; color: var(--muted);
+  }
+  .voice-q { color: var(--text); font-weight: 550; line-height: 1.45; }
+  .voice-a {
+    color: var(--muted); margin-top: 6px; padding-top: 6px;
+    border-top: 1px dashed var(--border); line-height: 1.45;
+  }
 
   /* Modal */
   .modal-bg {
-    position: fixed; inset: 0;
-    background: rgba(4, 6, 12, 0.78);
-    backdrop-filter: blur(8px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    z-index: 99;
+    position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center;
+    padding: 24px; z-index: 99;
   }
   .modal-bg.open { display: flex; }
   .modal {
-    width: 100%;
-    max-width: 760px;
-    max-height: 85vh;
-    overflow: auto;
-    background: #101624;
-    border: 1px solid rgba(255,255,255,0.14);
-    border-radius: 18px;
-    padding: 22px 24px;
+    width: 100%; max-width: 760px; max-height: 85vh; overflow: auto;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 18px; padding: 22px 24px; box-shadow: 0 24px 60px rgba(0,0,0,0.28);
   }
-  .modal pre {
-    white-space: pre-wrap;
-    font: 13.5px/1.6 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    color: #e2e8f0;
-    margin: 12px 0 0;
-  }
-  .empty { color: var(--muted); font-size: 13px; padding: 6px 0; }
-  .strip {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
-    margin-bottom: 18px;
-  }
-  @media (max-width: 900px) { .strip { grid-template-columns: 1fr; } }
-  .stat-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 14px 16px;
-    backdrop-filter: blur(14px);
-  }
-  .stat-k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 650; }
-  .stat-v { font-size: 15px; font-weight: 650; margin-top: 5px; }
-  .stat-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
-  .links-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
-  .link-pill {
-    display: inline-flex; align-items: center; gap: 6px;
-    text-decoration: none;
-    color: var(--text);
-    background: var(--panel);
-    border: 1px solid var(--border);
-    padding: 7px 12px;
-    border-radius: 999px;
-    font-size: 12.5px;
-    font-weight: 550;
-    transition: background 0.15s, border-color 0.15s;
-  }
-  .link-pill:hover { background: var(--panel-hover); border-color: rgba(66,133,244,0.5); }
-  .bm-pre {
-    white-space: pre-wrap;
-    font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
-    color: #cbd5e1;
-    background: rgba(0,0,0,0.28);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 12px;
-    margin: 0;
-    max-height: 260px;
-    overflow: auto;
-  }
-  .bar-track { height: 6px; background: rgba(255,255,255,0.1); border-radius: 999px; overflow: hidden; margin-top: 8px; }
-  .bar-fill { height: 100%; background: linear-gradient(90deg, #4285f4, #a855f7); border-radius: 999px; }
+  .modal pre { white-space: pre-wrap; font: 13.5px/1.6 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; color: var(--text); margin: 12px 0 0; }
+  .empty { color: var(--muted); font-size: 13px; padding: 4px 0; }
 </style>
 </head>
 <body>
 <div class="shell">
   <header class="topbar">
     <div class="brand">
-      <div>
-        <h1>Lump Nerve Centre</h1>
-        <div class="sub">Second Brain · Calendar · Meetings · Build Monitor · Antigravity PA</div>
-      </div>
+      <h1>Lump Nerve Centre</h1>
+      <div class="sub">Second Brain · Calendar · Meetings · Build Monitor · Antigravity PA</div>
     </div>
-    <div class="clock" id="clock">Loading…</div>
+    <div class="top-actions">
+      <div class="clock"><span class="live-dot"></span><span id="clock">Live</span></div>
+      <button class="btn sm" onclick="refresh()" title="Refresh all data now">↻ Refresh</button>
+      <button class="btn sm" id="themeBtn" onclick="toggleTheme()" title="Switch light / dark mode">🌙 Dark</button>
+    </div>
   </header>
 
   <div class="links-bar" id="linksBar"></div>
@@ -366,7 +264,7 @@
   <div class="strip">
     <div class="stat-card">
       <div class="stat-k">In Progress Now</div>
-      <div class="stat-v" id="inProgressVal">Idle</div>
+      <div class="stat-v" id="inProgressVal">Standing by</div>
       <div class="stat-sub" id="inProgressSub">No active agent sessions</div>
     </div>
     <div class="stat-card">
@@ -377,13 +275,13 @@
     <div class="stat-card">
       <div class="stat-k">Plan &amp; Usage</div>
       <div class="stat-v" id="planVal">Google AI Ultra</div>
-      <div class="stat-sub" id="planSub">Local voice &amp; dictation: $0/mo</div>
+      <div class="stat-sub" id="planSub">Local Whisper + Sonia TTS: $0/mo</div>
       <div class="bar-track" id="usageBarWrap" style="display:none"><div class="bar-fill" id="usageBarFill" style="width:0%"></div></div>
     </div>
   </div>
 
   <div class="grid">
-    <!-- LEFT COLUMN: Live Lump + Controls -->
+    <!-- LEFT COLUMN -->
     <div>
       <section class="card">
         <div class="card-head">
@@ -418,7 +316,7 @@
           <h2 class="card-title">Quick Inbox</h2>
           <span class="pill">inbox.md</span>
         </div>
-        <div id="inboxList" class="empty">Nothing in inbox yet.</div>
+        <div id="inboxList" class="empty">Inbox is empty.</div>
         <form class="cmd-row" style="margin-top:10px" onsubmit="addInbox(event)">
           <input class="field" id="inboxInput" placeholder="Capture a quick thought…" autocomplete="off" />
           <button class="btn" type="submit">Add</button>
@@ -426,7 +324,7 @@
       </section>
     </div>
 
-    <!-- MIDDLE COLUMN: Today / Priorities + Calendar -->
+    <!-- MIDDLE COLUMN -->
     <div>
       <section class="card">
         <div class="card-head">
@@ -444,7 +342,7 @@
       <section class="card">
         <div class="card-head">
           <h2 class="card-title">Upcoming Schedule</h2>
-          <span class="pill" id="calCount">0 events</span>
+          <span class="pill" id="calCount">0 upcoming</span>
         </div>
         <div class="mtg-list" id="calList">
           <div class="empty">No upcoming meetings synced yet.</div>
@@ -452,7 +350,7 @@
       </section>
     </div>
 
-    <!-- RIGHT COLUMN: Meeting Notes + Voice Log -->
+    <!-- RIGHT COLUMN -->
     <div>
       <section class="card" id="bmCard" style="display:none">
         <div class="card-head">
@@ -467,15 +365,18 @@
           <h2 class="card-title">Meeting Notes</h2>
           <span class="pill purple" id="notesCount">0 notes</span>
         </div>
-        <div id="notesList" class="empty">No recorded meetings yet.</div>
+        <div id="notesList" class="empty">Click "Start Meeting" to record &amp; summarize a call.</div>
       </section>
 
       <section class="card">
         <div class="card-head">
-          <h2 class="card-title">Recent Voice Log</h2>
-          <span class="pill" id="voicePill">Sonia</span>
+          <h2 class="card-title">Voice Log</h2>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span class="pill" id="voicePill">Sonia</span>
+            <button class="btn sm" onclick="clearVoiceLog()">Clear</button>
+          </div>
         </div>
-        <div id="voiceList" class="empty">No voice exchanges yet.</div>
+        <div id="voiceList" class="voice-list"><div class="empty">No voice entries yet.</div></div>
       </section>
     </div>
   </div>
@@ -485,7 +386,7 @@
   <div class="modal">
     <div class="card-head">
       <h2 class="card-title" id="modalTitle">Meeting Note</h2>
-      <button class="btn" onclick="closeModal()">Close</button>
+      <button class="btn sm" onclick="closeModal()">Close</button>
     </div>
     <pre id="modalBody"></pre>
   </div>
@@ -493,6 +394,19 @@
 
 <script>
 let stateData = null;
+
+// Theme (default: clean Light Mode, persisted in localStorage)
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('themeBtn').textContent = t === 'dark' ? '☀️ Light' : '🌙 Dark';
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = cur === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('lump:theme', next);
+  applyTheme(next);
+}
+applyTheme(localStorage.getItem('lump:theme') || 'light');
 
 function updateClock() {
   const now = new Date();
@@ -525,17 +439,16 @@ function formatWhen(ts) {
 
 function render(data) {
   stateData = data;
-  // Quick Links bar
+
   const links = (data.config && data.config.links) || [];
   document.getElementById('linksBar').innerHTML = links.map(l =>
     `<a class="link-pill" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.icon || '🔗')} ${esc(l.label)}</a>`
   ).join('');
 
-  // In Progress strip
   const sessions = (data.bridge_status && data.bridge_status.sessions) || {};
   const activeSessions = Object.entries(sessions).filter(([, s]) => s.state === 'working' || s.state === 'alert');
-  const mActiveNow = data.voice_status && data.voice_status.meeting && data.voice_status.meeting.active;
-  if (mActiveNow) {
+  const mActive = data.voice_status && data.voice_status.meeting && data.voice_status.meeting.active;
+  if (mActive) {
     document.getElementById('inProgressVal').textContent = 'Recording: ' + (data.voice_status.meeting.title || 'Meeting');
     document.getElementById('inProgressSub').textContent = `${data.voice_status.meeting.lines || 0} transcript chunks captured`;
   } else if (activeSessions.length) {
@@ -547,7 +460,6 @@ function render(data) {
     document.getElementById('inProgressSub').textContent = 'Press ⌥ ⌥ to dictate or ask Lump';
   }
 
-  // Up Next strip
   const nextMtg = (data.meetings_cal || []).find(m => m.start > Date.now() / 1000 - 300);
   if (nextMtg) {
     const w = formatWhen(nextMtg.start);
@@ -558,7 +470,6 @@ function render(data) {
     document.getElementById('upNextSub').textContent = 'Focus time';
   }
 
-  // Plan & Usage strip
   const planLabel = (data.config && data.config.plan_label) || 'Google AI Ultra';
   document.getElementById('planVal').textContent = planLabel;
   const usage = (data.bridge_status && data.bridge_status.usage) || {};
@@ -573,7 +484,6 @@ function render(data) {
     document.getElementById('usageBarWrap').style.display = 'none';
   }
 
-  // Build Monitor card
   const bmCard = document.getElementById('bmCard');
   if (data.build_monitor_md && data.build_monitor_md.trim()) {
     bmCard.style.display = 'block';
@@ -582,18 +492,13 @@ function render(data) {
     bmCard.style.display = 'none';
   }
 
-  // Mood
   const mood = (data.bridge_status && data.bridge_status.mood) || 'idle';
-  const pill = document.getElementById('moodPill');
-  pill.textContent = mood[0].toUpperCase() + mood.slice(1);
+  document.getElementById('moodPill').textContent = mood[0].toUpperCase() + mood.slice(1);
 
-  // Meeting button state
-  const mActive = data.voice_status && data.voice_status.meeting && data.voice_status.meeting.active;
   const mtgBtn = document.getElementById('mtgBtn');
   mtgBtn.textContent = mActive ? '⏹ Stop & Summarize' : '📝 Start Meeting';
   mtgBtn.className = mActive ? 'btn danger' : 'btn primary';
 
-  // Watch-outs from today.md
   const todayLines = (data.today_md || '').split('\n');
   const watchouts = [];
   let inWatch = false;
@@ -603,92 +508,95 @@ function render(data) {
     if (inWatch && ln.trim().startsWith('- ')) watchouts.push(ln.trim().slice(2));
   }
   const wWrap = document.getElementById('watchoutsWrap');
-  if (watchouts.length) {
-    wWrap.innerHTML = `<div class="watchouts"><b>Heads-Up</b><ul>${watchouts.map(w => `<li>${esc(w).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</li>`).join('')}</ul></div>`;
-  } else {
-    wWrap.innerHTML = '';
-  }
+  wWrap.innerHTML = watchouts.length
+    ? `<div class="watchouts"><b>Heads-Up</b><ul>${watchouts.map(w => `<li>${esc(w).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</li>`).join('')}</ul></div>`
+    : '';
 
-  // Todos from today.md
   const todos = [];
   todayLines.forEach((ln, idx) => {
     const m = ln.match(/^\s*-\s+\[([ xX])\]\s+(.+)$/);
     if (m) todos.push({ lineIndex: idx, done: m[1].toLowerCase() === 'x', text: m[2] });
   });
-  const openCount = todos.filter(t => !t.done).length;
-  document.getElementById('todoCount').textContent = `${openCount} open`;
-  const todoEl = document.getElementById('todoList');
-  if (!todos.length) {
-    todoEl.innerHTML = '<li class="empty">All clear! Add a task below.</li>';
-  } else {
-    todoEl.innerHTML = todos.map(t => `
+  document.getElementById('todoCount').textContent = `${todos.filter(t => !t.done).length} open`;
+  document.getElementById('todoList').innerHTML = !todos.length
+    ? '<li class="empty">All clear! Add a task below.</li>'
+    : todos.map(t => `
       <li class="todo-item ${t.done ? 'done' : ''}" onclick="toggleTodo(${t.lineIndex})">
         <input type="checkbox" ${t.done ? 'checked' : ''} onclick="event.stopPropagation(); toggleTodo(${t.lineIndex})" />
         <span>${esc(t.text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\*(.+?)\*/g, '<em>$1</em>')}</span>
       </li>
     `).join('');
-  }
 
-  // Calendar meetings
   const nowSec = Date.now() / 1000;
   const upcoming = (data.meetings_cal || []).filter(m => (m.end || m.start + 3600) > nowSec - 600);
   document.getElementById('calCount').textContent = `${upcoming.length} upcoming`;
-  const calEl = document.getElementById('calList');
-  if (!upcoming.length) {
-    calEl.innerHTML = '<div class="empty">No upcoming meetings in meetings.json.</div>';
-  } else {
-    calEl.innerHTML = upcoming.slice(0, 10).map(m => {
-      const w = formatWhen(m.start);
-      return `
-        <div class="mtg-item">
-          <div>
-            <div class="mtg-title">${esc(m.summary || m.title || 'Meeting')}</div>
-            <div class="mtg-time">${w.dayStr} · ${w.timeStr}</div>
+  document.getElementById('calList').innerHTML = !upcoming.length
+    ? '<div class="empty">No upcoming meetings in meetings.json.</div>'
+    : upcoming.slice(0, 10).map(m => {
+        const w = formatWhen(m.start);
+        const title = m.summary || m.title || 'Meeting';
+        const titleHtml = m.htmlLink
+          ? `<a class="mtg-title" href="${esc(m.htmlLink)}" target="_blank" rel="noopener">${esc(title)} ↗</a>`
+          : `<div class="mtg-title">${esc(title)}</div>`;
+        const locPart = m.location ? ` · ${esc(m.location)}` : '';
+        const joinHtml = m.meetLink
+          ? `<a class="mtg-link" href="${esc(m.meetLink)}" target="_blank" rel="noopener">Join Meet</a>`
+          : '';
+        return `
+          <div class="mtg-item">
+            <div style="min-width:0">
+              ${titleHtml}
+              <div class="mtg-time">${w.dayStr} · ${w.timeStr}${locPart}</div>
+            </div>
+            <div class="mtg-actions">
+              ${joinHtml}
+              <button class="btn sm" onclick="startNamedMeeting('${esc(title).replace(/'/g, "\\'")}')" title="Start recording notes for this meeting">🎙️</button>
+              <span class="mtg-badge ${w.soon ? 'soon' : ''}">${w.badge}</span>
+            </div>
           </div>
-          <span class="mtg-badge ${w.soon ? 'soon' : ''}">${w.badge}</span>
-        </div>
-      `;
-    }).join('');
-  }
+        `;
+      }).join('');
 
-  // Inbox
   const inboxLines = (data.inbox_md || '').split('\n').filter(l => l.trim().startsWith('- '));
-  const inboxEl = document.getElementById('inboxList');
-  if (!inboxLines.length) {
-    inboxEl.innerHTML = '<div class="empty">Inbox is empty.</div>';
-  } else {
-    inboxEl.innerHTML = inboxLines.slice(-6).map(l => `<div class="note-item"><div class="note-name">${esc(l.trim().slice(2))}</div></div>`).join('');
-  }
+  document.getElementById('inboxList').innerHTML = !inboxLines.length
+    ? '<div class="empty">Inbox is empty.</div>'
+    : inboxLines.slice(-6).map(l => `<div class="note-item"><div class="note-name">${esc(l.trim().slice(2))}</div></div>`).join('');
 
-  // Meeting Notes
   const notes = data.meeting_notes || [];
   document.getElementById('notesCount').textContent = `${notes.length} notes`;
-  const notesEl = document.getElementById('notesList');
-  if (!notes.length) {
-    notesEl.innerHTML = '<div class="empty">Click "Start Meeting" to record &amp; summarize a call.</div>';
-  } else {
-    notesEl.innerHTML = notes.map(n => `
+  document.getElementById('notesList').innerHTML = !notes.length
+    ? '<div class="empty">Click "Start Meeting" to record &amp; summarize a call.</div>'
+    : notes.map(n => `
       <div class="note-item" onclick="openNote('${esc(n.name)}')">
         <div class="note-name">${esc(n.title)}</div>
         <div class="note-meta">${esc(n.date)} · ${n.size_kb} KB</div>
       </div>
     `).join('');
-  }
 
-  // Voice log
-  const hist = (data.voice_history || []).slice(-6).reverse();
-  const vEl = document.getElementById('voiceList');
+  const hist = (data.voice_history || []).slice(-8).reverse();
   const voiceName = (data.config && data.config.edge_voice) || (data.voice_status && data.voice_status.voice) || 'Sonia';
   document.getElementById('voicePill').textContent = voiceName.replace('en-GB-', '').replace('Neural', '');
+  const vEl = document.getElementById('voiceList');
   if (!hist.length) {
-    vEl.innerHTML = '<div class="empty">Talk to Lump with the mic button or command bar.</div>';
+    vEl.innerHTML = '<div class="empty">No voice entries yet. Press ⌥ ⌥ to dictate or ask Lump!</div>';
   } else {
-    vEl.innerHTML = hist.map(h => `
-      <div class="voice-item">
-        <div class="voice-q">You: ${esc(h.transcript)}</div>
-        <div class="voice-a">Lump: ${esc(h.reply || h.error || '…')}</div>
-      </div>
-    `).join('');
+    vEl.innerHTML = hist.map(h => {
+      const ts = h.ts ? new Date(h.ts * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+      const isDictate = h.mode === 'dictate';
+      const badge = h.error
+        ? '<span class="pill err">Needs Auth</span>'
+        : (isDictate ? '<span class="pill green">Dictated</span>' : '<span class="pill">Lump</span>');
+      const replyHtml = h.reply
+        ? `<div class="voice-a">${esc(h.reply)}</div>`
+        : (h.error ? `<div class="voice-a">Run <code>gemini</code> once in Terminal to sign in.</div>` : '');
+      return `
+        <div class="voice-entry">
+          <div class="voice-meta">${badge}<span>${ts}</span></div>
+          <div class="voice-q">${esc(h.transcript)}</div>
+          ${replyHtml}
+        </div>
+      `;
+    }).join('');
   }
 }
 
@@ -699,66 +607,55 @@ async function refresh() {
   } catch {}
 }
 
-async function toggleTodo(lineIndex) {
-  await fetch('/api/todo/toggle', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ line: lineIndex })
-  });
+async function clearVoiceLog() {
+  await fetch('/api/voice/clear', { method: 'POST' });
   refresh();
 }
 
+async function toggleTodo(lineIndex) {
+  await fetch('/api/todo/toggle', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ line: lineIndex }) });
+  refresh();
+}
 async function addTodo(e) {
   e.preventDefault();
-  const inp = document.getElementById('todoInput');
-  const text = inp.value.trim();
+  const inp = document.getElementById('todoInput'), text = inp.value.trim();
   if (!text) return;
   inp.value = '';
-  await fetch('/api/todo/add', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ text, target: 'today' })
-  });
+  await fetch('/api/todo/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ text, target: 'today' }) });
   refresh();
 }
-
 async function addInbox(e) {
   e.preventDefault();
-  const inp = document.getElementById('inboxInput');
-  const text = inp.value.trim();
+  const inp = document.getElementById('inboxInput'), text = inp.value.trim();
   if (!text) return;
   inp.value = '';
-  await fetch('/api/todo/add', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ text, target: 'inbox' })
-  });
+  await fetch('/api/todo/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ text, target: 'inbox' }) });
   refresh();
 }
-
 async function askLump(e) {
   e.preventDefault();
-  const inp = document.getElementById('askInput');
-  const text = inp.value.trim();
+  const inp = document.getElementById('askInput'), text = inp.value.trim();
   if (!text) return;
   inp.value = '';
-  await fetch('/transcribe_and_run', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ text })
-  });
+  await fetch('/transcribe_and_run', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ text }) });
   setTimeout(refresh, 1500);
 }
-
 async function setColour(hex) {
-  await fetch('/api/colour', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ colour: hex })
-  });
+  await fetch('/api/colour', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ colour: hex }) });
 }
-
 async function toggleMeeting() {
   const active = stateData && stateData.voice_status && stateData.voice_status.meeting && stateData.voice_status.meeting.active;
   await fetch(active ? '/meeting/stop' : '/meeting/start', { method: 'POST', body: '{}' });
   setTimeout(refresh, 400);
 }
-
+async function startNamedMeeting(title) {
+  await fetch('/meeting/start', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ title })
+  });
+  setTimeout(refresh, 400);
+}
 async function readBriefing() {
   if (!stateData) return;
   const open = (stateData.today_md || '').split('\n').filter(l => /^\s*-\s+\[ \]/.test(l)).length;
@@ -768,20 +665,14 @@ async function readBriefing() {
     const w = formatWhen(next.start);
     msg += ` Your next meeting is ${next.summary || next.title} on ${w.dayStr} at ${w.timeStr}.`;
   }
-  await fetch('/speak', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ text: msg })
-  });
+  await fetch('/speak', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ text: msg }) });
 }
-
 async function playGag() {
   await fetch('http://127.0.0.1:47823/play', { method: 'POST', body: 'tap' }).catch(() => {});
 }
-
 async function stopSpeaking() {
   await fetch('/stop_speaking', { method: 'POST' });
 }
-
 async function openNote(name) {
   const r = await fetch('/api/meeting/' + encodeURIComponent(name));
   if (!r.ok) return;
@@ -789,13 +680,10 @@ async function openNote(name) {
   document.getElementById('modalBody').textContent = await r.text();
   document.getElementById('modalBg').classList.add('open');
 }
-
-function closeModal() {
-  document.getElementById('modalBg').classList.remove('open');
-}
+function closeModal() { document.getElementById('modalBg').classList.remove('open'); }
 
 refresh();
-setInterval(refresh, 4000);
+setInterval(refresh, 3000);
 </script>
 </body>
 </html>
