@@ -15,6 +15,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BUILD/LumpDesk" "$APP/Contents/MacOS/LumpDesk"
 
 if [ -f "$ROOT/tools/lumpbar/icon.png" ]; then
+  cp "$ROOT/tools/lumpbar/icon.png" "$APP/Contents/Resources/menuicon.png"
   ICONSET="$BUILD/LumpDesk.iconset"; mkdir -p "$ICONSET"
   for px in 16 32 128 256 512; do
     sips -z $px $px "$ROOT/tools/lumpbar/icon.png" --out "$ICONSET/icon_${px}x${px}.png" >/dev/null

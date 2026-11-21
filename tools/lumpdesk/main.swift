@@ -341,11 +341,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         }.resume()
     }
 
+    private func loadMenuIcon() -> NSImage? {
+        if let url = Bundle.main.url(forResource: "menuicon", withExtension: "png"),
+           let img = NSImage(contentsOf: url) {
+            img.size = NSSize(width: 18, height: 18)
+            img.isTemplate = false
+            return img
+        }
+        let sym = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "Lump")
+        sym?.isTemplate = true
+        return sym
+    }
+
     private func setupMenuBarItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.autosaveName = "LumpDeskStatusItem"
+        statusItem.isVisible = true
         if let btn = statusItem.button {
-            btn.image = NSImage(systemSymbolName: "sparkle", accessibilityDescription: "Lump")
-            btn.image?.isTemplate = true
+            if let icon = loadMenuIcon() {
+                btn.image = icon
+                btn.title = ""
+            } else {
+                btn.title = "Lump"
+            }
             btn.toolTip = "Lump — Click for all actions (⌥ ⌥ to dictate)"
         }
         let barMenu = NSMenu()
@@ -382,8 +400,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
             btn.image?.isTemplate = false
             btn.contentTintColor = .systemPurple
         } else {
-            btn.image = NSImage(systemSymbolName: "sparkle", accessibilityDescription: "Lump")
-            btn.image?.isTemplate = true
+            if let icon = loadMenuIcon() {
+                btn.image = icon
+                btn.title = ""
+            } else {
+                btn.image = nil
+                btn.title = "Lump"
+            }
             btn.contentTintColor = nil
         }
     }
