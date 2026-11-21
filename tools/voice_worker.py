@@ -531,6 +531,95 @@ class VoiceCoordinator:
 coord = VoiceCoordinator()
 
 
+def build_dashboard_payload() -> dict:
+    today_md = ""
+    inbox_md = ""
+    try:
+        with open(os.path.join(PA_DIR, "today.md"), "r", encoding="utf-8") as f:
+            today_md = f.read()
+    except OSError:
+        pass
+    try:
+        with open(os.path.join(PA_DIR, "inbox.md"), "r", encoding="utf-8") as f:
+            inbox_md = f.read()
+    except OSError:
+        pass
+
+    meetings_cal = []
+    try:
+        with open(os.path.join(HOME, "meetings.json"), "r", encoding="utf-8") as f:
+            meetings_cal = json.load(f)
+    except Exception:
+        pass
+
+    meeting_notes = []
+    if os.path.isdir(MEETINGS_DIR):
+        for name in sorted(os.listdir(MEETINGS_DIR), reverse=True):
+            if not name.endswith(".md"):
+                continue
+            fpath = os.path.join(MEETINGS_DIR, name)
+            title = name[:-3]
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    first = f.readline().strip()
+                    if first.startswith("# "):
+                        title = first[2:].strip()
+                st = os.stat(fpath)
+                meeting_notes.append({
+                    "name": name,
+                    "title": title,
+                    "date": time.strftime("%a %d %b %H:%M", time.localtime(st.st_mtime)),
+                    "size_kb": round(st.st_size / 1024.0, 1),
+                })
+            except OSError:
+                pass
+
+    voice_history = []
+    hp = os.path.join(HOME, "voice_history.jsonl")
+    if os.path.isfile(hp):
+        try:
+            with open(hp, "r", encoding="utf-8") as f:
+                for line in f.readlines()[-20:]:
+                    line = line.strip()
+                    if line:
+                        voice_history.append(json.loads(line))
+        except Exception:
+            pass
+
+    bridge_status = {}
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:47823/status", timeout=0.4) as r:
+            bridge_status = json.loads(r.read().decode("utf-8"))
+    except Exception:
+        pass
+
+    cfg = read_config()
+    safe_cfg = {k: v for k, v in cfg.items() if "key" not in k.lower() and "token" not in k.lower()}
+
+    build_monitor_md = ""
+    bm_path = cfg.get("build_monitor_file")
+    if bm_path:
+        bm_full = os.path.expanduser(bm_path)
+        if os.path.isfile(bm_full):
+            try:
+                with open(bm_full, "r", encoding="utf-8") as f:
+                    build_monitor_md = f.read()
+            except OSError:
+                pass
+
+    return {
+        "today_md": today_md,
+        "inbox_md": inbox_md,
+        "meetings_cal": meetings_cal,
+        "meeting_notes": meeting_notes,
+        "voice_history": voice_history,
+        "bridge_status": bridge_status,
+        "voice_status": coord.status(),
+        "build_monitor_md": build_monitor_md,
+        "config": safe_cfg,
+    }
+
+
 class VoiceHandler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -544,9 +633,29 @@ class VoiceHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        if self.path == "/health":
+        path = self.path.split("?", 1)[0]
+        if path in ("/", "/index.html"):
+            dash_path = os.path.join(HOME, "dashboard.html")
+            if not os.path.exists(dash_path):
+                dash_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
+            if os.path.exists(dash_path):
+                with open(dash_path, "rb") as f:
+                    self._reply(200, f.read(), "text/html; charset=utf-8")
+            else:
+                self._reply(404, b"dashboard.html not found", "text/plain")
+        elif path == "/api/dashboard":
+            self._reply(200, json.dumps(build_dashboard_payload()).encode("utf-8"))
+        elif path.startswith("/api/meeting/"):
+            fname = os.path.basename(urllib.request.unquote(path[len("/api/meeting/"):]))
+            fpath = os.path.join(MEETINGS_DIR, fname)
+            if fname.endswith(".md") and os.path.isfile(fpath):
+                with open(fpath, "rb") as f:
+                    self._reply(200, f.read(), "text/markdown; charset=utf-8")
+            else:
+                self._reply(404, b"Meeting note not found", "text/plain")
+        elif path == "/health":
             self._reply(200, json.dumps(coord.status(), indent=2).encode("utf-8"))
-        elif self.path == "/voices":
+        elif path == "/voices":
             self._reply(200, json.dumps(coord.list_voices(), indent=2).encode("utf-8"))
         else:
             self._reply(404, b'{"error":"not found"}')
@@ -614,6 +723,54 @@ class VoiceHandler(http.server.BaseHTTPRequestHandler):
         elif self.path == "/meeting/stop":
             res = coord.meeting_stop_bg()
             self._reply(202, json.dumps(res).encode("utf-8"))
+        elif self.path == "/api/todo/toggle":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+                idx = int(data.get("line", -1))
+                today_path = os.path.join(PA_DIR, "today.md")
+                if os.path.isfile(today_path):
+                    lines = open(today_path, "r", encoding="utf-8").read().splitlines()
+                    if 0 <= idx < len(lines):
+                        if "- [ ]" in lines[idx]:
+                            lines[idx] = lines[idx].replace("- [ ]", "- [x]", 1)
+                        elif "- [x]" in lines[idx] or "- [X]" in lines[idx]:
+                            lines[idx] = re.sub(r"- \[[xX]\]", "- [ ]", lines[idx], count=1)
+                        with open(today_path, "w", encoding="utf-8") as f:
+                            f.write("\n".join(lines) + "\n")
+                self._reply(200, b'{"ok":true}')
+            except Exception as e:
+                self._reply(400, json.dumps({"error": str(e)}).encode("utf-8"))
+        elif self.path == "/api/todo/add":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+                text = (data.get("text") or "").strip()
+                target = data.get("target") or "today"
+                if text:
+                    os.makedirs(PA_DIR, exist_ok=True)
+                    if target == "inbox":
+                        p = os.path.join(PA_DIR, "inbox.md")
+                        with open(p, "a", encoding="utf-8") as f:
+                            f.write(f"\n- {text}")
+                    else:
+                        p = os.path.join(PA_DIR, "today.md")
+                        with open(p, "a", encoding="utf-8") as f:
+                            f.write(f"\n- [ ] {text}")
+                self._reply(200, b'{"ok":true}')
+            except Exception as e:
+                self._reply(400, json.dumps({"error": str(e)}).encode("utf-8"))
+        elif self.path == "/api/colour":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+                col = (data.get("colour") or "").strip().lstrip("#").upper()
+                if len(col) == 6:
+                    p = os.path.join(HOME, "config.json")
+                    cfg = read_config()
+                    cfg["colour"] = col
+                    with open(p, "w", encoding="utf-8") as f:
+                        json.dump(cfg, f, indent=2)
+                self._reply(200, b'{"ok":true}')
+            except Exception as e:
+                self._reply(400, json.dumps({"error": str(e)}).encode("utf-8"))
         else:
             self._reply(404, b'{"error":"not found"}')
 

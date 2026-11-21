@@ -589,6 +589,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         NSWorkspace.shared.open(URL(fileURLWithPath: path))
     }
 
+    @objc func openNerveCentre() {
+        if let url = URL(string: "http://127.0.0.1:47824/") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     @objc func triggerTap() {
         webView.evaluateJavaScript("window.__lumpWidgetTap && window.__lumpWidgetTap()", completionHandler: nil)
     }
@@ -640,6 +646,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         let autoMtg = NSMenuItem(title: "Auto-Record Calendar Meetings", action: #selector(toggleAutoRecordMeetings), keyEquivalent: "")
         autoMtg.state = isAutoRecordEnabled() ? .on : .off
         menu.addItem(autoMtg)
+        menu.addItem(withTitle: "Open Lump Nerve Centre (Dashboard)", action: #selector(openNerveCentre), keyEquivalent: "")
         menu.addItem(withTitle: "Open Lump-PA Folder (Today & Meetings)", action: #selector(openPAFolder), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Stop Speaking", action: #selector(stopSpeaking), keyEquivalent: "")

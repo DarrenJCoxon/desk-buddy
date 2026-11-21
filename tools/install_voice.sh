@@ -17,6 +17,7 @@ fi
 
 mkdir -p "$RT" "$HOME/Library/LaunchAgents"
 cp "$ROOT/tools/voice_worker.py" "$RT/voice_worker.py"
+cp "$ROOT/tools/dashboard.html" "$RT/dashboard.html"
 
 cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
