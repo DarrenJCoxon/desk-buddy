@@ -32,6 +32,8 @@ VOICE_PORT = 47824
 BRIDGE_HOOK_URL = "http://127.0.0.1:47823/hook"
 DEFAULT_WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 DEFAULT_WHISPER_LANG = "en"
+DEFAULT_TTS_ENGINE = "edge"
+DEFAULT_EDGE_VOICE = "en-GB-SoniaNeural"
 DEFAULT_KOKORO_VOICE = "bm_fable"
 DEFAULT_KOKORO_SPEED = 1.05
 KOKORO_DIR = os.path.join(HOME, "kokoro")
@@ -172,32 +174,57 @@ class VoiceCoordinator:
             return
         self.stop_speaking()
         cfg = read_config()
-        voice = voice_override or cfg.get("kokoro_voice") or DEFAULT_KOKORO_VOICE
-        speed = float(speed_override or cfg.get("kokoro_speed") or DEFAULT_KOKORO_SPEED)
-        lang = "en-gb" if voice.startswith(("bf_", "bm_")) else "en-us"
+        engine = (cfg.get("tts_engine") or DEFAULT_TTS_ENGINE).lower()
+        # Allow explicit Kokoro voice override (e.g. bf_emma) or Edge voice override (e.g. en-GB-SoniaNeural)
+        if voice_override and "Neural" in voice_override:
+            engine = "edge"
+        elif voice_override and "_" in voice_override:
+            engine = "kokoro"
 
         self.set_state("speaking")
         tmp_path = None
         try:
-            k = self._get_kokoro()
-            if k is None:
-                log.warning("Kokoro model not ready yet; skipping speech")
-                return
-            import soundfile as sf
+            if engine == "edge":
+                try:
+                    import edge_tts
 
-            t0 = time.time()
-            samples, sample_rate = k.create(spoken, voice=voice, speed=speed, lang=lang)
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-                tmp_path = tmp.name
-            sf.write(tmp_path, samples, sample_rate)
-            log.info("Kokoro synthesized (%s) in %.2fs", voice, time.time() - t0)
+                    edge_voice = voice_override or cfg.get("edge_voice") or DEFAULT_EDGE_VOICE
+                    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+                        tmp_path = tmp.name
+                    t0 = time.time()
+                    asyncio.run(edge_tts.Communicate(spoken, edge_voice).save(tmp_path))
+                    log.info("edge-tts synthesized (%s) in %.2fs", edge_voice, time.time() - t0)
+                except Exception as e:
+                    log.warning("edge-tts failed (%s); falling back to Kokoro offline TTS", e)
+                    if tmp_path:
+                        try: os.unlink(tmp_path)
+                        except OSError: pass
+                        tmp_path = None
+                    engine = "kokoro"
+
+            if engine != "edge":
+                voice = voice_override or cfg.get("kokoro_voice") or DEFAULT_KOKORO_VOICE
+                speed = float(speed_override or cfg.get("kokoro_speed") or DEFAULT_KOKORO_SPEED)
+                lang = "en-gb" if voice.startswith(("bf_", "bm_")) else "en-us"
+                k = self._get_kokoro()
+                if k is None:
+                    log.warning("Kokoro model not ready; skipping speech")
+                    return
+                import soundfile as sf
+
+                t0 = time.time()
+                samples, sample_rate = k.create(spoken, voice=voice, speed=speed, lang=lang)
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                    tmp_path = tmp.name
+                sf.write(tmp_path, samples, sample_rate)
+                log.info("Kokoro synthesized (%s) in %.2fs", voice, time.time() - t0)
 
             proc = subprocess.Popen(["afplay", tmp_path])
             with self.lock:
                 self._play_proc = proc
             proc.wait()
         except Exception as e:
-            log.warning("Kokoro TTS failed: %s", e)
+            log.warning("TTS failed: %s", e)
         finally:
             with self.lock:
                 self._play_proc = None
