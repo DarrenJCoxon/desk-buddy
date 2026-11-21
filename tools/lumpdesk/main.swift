@@ -101,7 +101,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
     var statusBadge: NSTextField!
     var levelBarBg: NSView!
     var levelBarFill: NSView!
+    var statusItem: NSStatusItem!
     var alwaysOnTop = true
+    var prismVisible = true
     var currentSize: CGFloat = 180
 
     private var captureSession: AVCaptureSession?
@@ -283,7 +285,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
 
         window.contentView = container
         window.makeKeyAndOrderFront(nil)
+        setupMenuBarItem()
         registerGlobalHotKey()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screensChanged),
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
 
         Timer.scheduledTimer(withTimeInterval: 0.7, repeats: true) { [weak self] _ in
             self?.pollVoiceHealth()
@@ -331,6 +341,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         }.resume()
     }
 
+    private func setupMenuBarItem() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let btn = statusItem.button {
+            btn.image = NSImage(systemSymbolName: "sparkle", accessibilityDescription: "Lump")
+            btn.image?.isTemplate = true
+            btn.target = self
+            btn.action = #selector(menuBarClicked)
+            btn.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            btn.toolTip = "Lump — Click for all actions (⌥ ⌥ to dictate)"
+        }
+    }
+
+    private func updateMenuBarIcon() {
+        guard let btn = statusItem?.button else { return }
+        if isRecording {
+            btn.image = NSImage(systemSymbolName: "record.circle.fill", accessibilityDescription: "Lump Listening")
+            btn.image?.isTemplate = false
+            btn.contentTintColor = .systemRed
+        } else if meetingRecorder.isActive {
+            btn.image = NSImage(systemSymbolName: "waveform.circle.fill", accessibilityDescription: "Lump Recording Meeting")
+            btn.image?.isTemplate = false
+            btn.contentTintColor = .systemPurple
+        } else {
+            btn.image = NSImage(systemSymbolName: "sparkle", accessibilityDescription: "Lump")
+            btn.image?.isTemplate = true
+            btn.contentTintColor = nil
+        }
+    }
+
+    @objc func menuBarClicked() {
+        let menu = buildContextMenu()
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    @objc func screensChanged() {
+        ensureWindowOnScreen()
+    }
+
+    private func ensureWindowOnScreen() {
+        let frame = window.frame
+        let onAnyScreen = NSScreen.screens.contains { $0.visibleFrame.intersects(frame) }
+        if !onAnyScreen {
+            let screen = NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1200, height: 800)
+            let origin = NSPoint(x: screen.maxX - frame.width - 28, y: screen.minY + 28)
+            window.setFrameOrigin(origin)
+        }
+    }
+
+    @objc func togglePrismVisible() {
+        prismVisible.toggle()
+        if prismVisible {
+            ensureWindowOnScreen()
+            window.orderFront(nil)
+        } else {
+            window.orderOut(nil)
+        }
+    }
+
     private func setVoiceMood(_ mood: String?) {
         let js = mood == nil
             ? "window.__lumpSetVoiceMood && window.__lumpSetVoiceMood(null)"
@@ -342,6 +412,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
 
     private func updateBadge() {
         DispatchQueue.main.async {
+            self.updateMenuBarIcon()
             self.statusBadge.isHidden = true
             self.levelBarBg.isHidden = true
             if self.isRecording {
@@ -637,17 +708,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
     @objc func reloadWidget() { webView.load(URLRequest(url: WIDGET_URL)) }
     @objc func quitApp() { NSApp.terminate(nil) }
 
-    func showMenu(_ event: NSEvent) {
+    func buildContextMenu() -> NSMenu {
         let menu = NSMenu()
+        menu.addItem(withTitle: "Open Lump Nerve Centre", action: #selector(openNerveCentre), keyEquivalent: "")
+        menu.addItem(.separator())
         menu.addItem(withTitle: isRecording ? "Stop Recording (⌥ ⌥)" : "Dictate into Active App (⌥ ⌥)", action: #selector(toggleDictation), keyEquivalent: "")
-        menu.addItem(withTitle: "Ask Lump Agent (Mic Button)", action: #selector(toggleRecording), keyEquivalent: "")
+        menu.addItem(withTitle: "Ask Lump Agent", action: #selector(toggleRecording), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: meetingRecorder.isActive ? "Stop Meeting Notes & Summarize" : "Start Meeting Notes (Dual-Track)", action: #selector(toggleMeetingRecording), keyEquivalent: "")
         let autoMtg = NSMenuItem(title: "Auto-Record Calendar Meetings", action: #selector(toggleAutoRecordMeetings), keyEquivalent: "")
         autoMtg.state = isAutoRecordEnabled() ? .on : .off
         menu.addItem(autoMtg)
-        menu.addItem(withTitle: "Open Lump Nerve Centre (Dashboard)", action: #selector(openNerveCentre), keyEquivalent: "")
-        menu.addItem(withTitle: "Open Lump-PA Folder (Today & Meetings)", action: #selector(openPAFolder), keyEquivalent: "")
+        menu.addItem(withTitle: "Open Lump-PA Folder", action: #selector(openPAFolder), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Stop Speaking", action: #selector(stopSpeaking), keyEquivalent: "")
         menu.addItem(withTitle: "Show Last Reply", action: #selector(showLastReply), keyEquivalent: "")
@@ -673,6 +745,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         menu.addItem(micParent)
 
         menu.addItem(.separator())
+        let showPrismItem = NSMenuItem(title: prismVisible ? "Hide Floating Prism" : "Show Floating Prism", action: #selector(togglePrismVisible), keyEquivalent: "")
+        menu.addItem(showPrismItem)
         menu.addItem(withTitle: "Tap Lump (Random Gag)", action: #selector(triggerTap), keyEquivalent: "")
 
         let topItem = NSMenuItem(title: "Always on Top", action: #selector(toggleAlwaysOnTop), keyEquivalent: "")
@@ -691,11 +765,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         menu.addItem(sizeParent)
 
         menu.addItem(withTitle: "Mute / Unmute Sound", action: #selector(toggleSound), keyEquivalent: "")
-        menu.addItem(withTitle: "Reload", action: #selector(reloadWidget), keyEquivalent: "")
+        menu.addItem(withTitle: "Reload Prism", action: #selector(reloadWidget), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit LumpDesk", action: #selector(quitApp), keyEquivalent: "q")
+        return menu
+    }
 
-        NSMenu.popUpContextMenu(menu, with: event, for: window.contentView!)
+    func showMenu(_ event: NSEvent) {
+        NSMenu.popUpContextMenu(buildContextMenu(), with: event, for: window.contentView!)
     }
 }
 
