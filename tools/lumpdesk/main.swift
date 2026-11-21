@@ -437,18 +437,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
             guard session.canAddOutput(output) else { return }
             session.addOutput(output)
 
-            output.audioSettings = [
-                AVFormatIDKey: Int(kAudioFormatLinearPCM),
-                AVSampleRateKey: 16000.0,
-                AVNumberOfChannelsKey: 1,
-                AVLinearPCMBitDepthKey: 16,
-                AVLinearPCMIsFloatKey: false,
-                AVLinearPCMIsBigEndianKey: false,
-            ]
-
             session.startRunning()
-            let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("lump_voice_\(UUID().uuidString).wav")
-            output.startRecording(to: tmp, outputFileType: .wav, recordingDelegate: self)
+            let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("lump_voice_\(UUID().uuidString).m4a")
+            output.startRecording(to: tmp, outputFileType: .m4a, recordingDelegate: self)
 
             captureSession = session
             fileOutput = output
@@ -497,6 +488,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         pb.clearContents()
         pb.setString(text, forType: .string)
 
+        let trusted = AXIsProcessTrusted()
+        if !trusted {
+            let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            AXIsProcessTrustedWithOptions(opts)
+            // Keep transcribed text on clipboard so user can Cmd+V immediately until Accessibility is granted
+            return
+        }
+
         // Send synthetic Cmd+V to the currently focused app
         let src = CGEventSource(stateID: .hidSystemState)
         let keyV: CGKeyCode = 9 // 'v'
@@ -537,7 +536,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         guard let endpoint = URL(string: "\(VOICE_BASE)\(path)") else { return }
         var req = URLRequest(url: endpoint)
         req.httpMethod = "POST"
-        req.setValue("audio/wav", forHTTPHeaderField: "Content-Type")
+        req.setValue("audio/mp4", forHTTPHeaderField: "Content-Type")
         req.httpBody = data
         URLSession.shared.dataTask(with: req) { [weak self] respData, _, _ in
             guard let self = self else { return }

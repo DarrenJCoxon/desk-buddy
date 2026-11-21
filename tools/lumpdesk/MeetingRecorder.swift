@@ -163,14 +163,6 @@ final class MeetingRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
                 if session.canAddInput(input) { session.addInput(input) }
                 let output = AVCaptureAudioFileOutput()
                 if session.canAddOutput(output) { session.addOutput(output) }
-                output.audioSettings = [
-                    AVFormatIDKey: Int(kAudioFormatLinearPCM),
-                    AVSampleRateKey: 16000.0,
-                    AVNumberOfChannelsKey: 1,
-                    AVLinearPCMBitDepthKey: 16,
-                    AVLinearPCMIsFloatKey: false,
-                    AVLinearPCMIsBigEndianKey: false,
-                ]
                 session.startRunning()
                 self.captureSession = session
                 self.fileOutput = output
@@ -199,8 +191,8 @@ final class MeetingRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
 
     private func beginMicChunk() {
         guard let output = fileOutput, isActive, !isStopping else { return }
-        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("lump_mtg_mic_\(UUID().uuidString).wav")
-        output.startRecording(to: tmp, outputFileType: .wav, recordingDelegate: self)
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("lump_mtg_mic_\(UUID().uuidString).m4a")
+        output.startRecording(to: tmp, outputFileType: .m4a, recordingDelegate: self)
     }
 
     private func rotateChunks() {

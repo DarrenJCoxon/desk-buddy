@@ -208,23 +208,18 @@ class VoiceCoordinator:
                     pass
             self.set_state("idle")
 
-    def transcribe_wav(self, wav_bytes: bytes) -> str:
+    def transcribe_wav(self, audio_bytes: bytes, ext: str = ".m4a") -> str:
         import mlx_whisper
 
         cfg = read_config()
         model_repo = cfg.get("whisper_model") or DEFAULT_WHISPER_MODEL
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            tmp.write(wav_bytes)
+        # Detect WAV vs M4A automatically from header bytes
+        suffix = ".wav" if audio_bytes[:4] == b"RIFF" else ext
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(audio_bytes)
             tmp_path = tmp.name
         try:
-            import soundfile as sf, numpy as np
-            try:
-                data, sr = sf.read(tmp_path, dtype="float32")
-                peak = float(np.max(np.abs(data))) if data.size else 0.0
-                dur = len(data) / float(sr) if sr else 0.0
-                log.info("received audio: %.2fs, %d Hz, peak=%.4f (%d bytes)", dur, sr, peak, len(wav_bytes))
-            except Exception as e:
-                log.warning("audio inspect failed: %s", e)
+            log.info("received audio: %d bytes (%s)", len(audio_bytes), suffix)
             t0 = time.time()
             lang = cfg.get("whisper_language") or DEFAULT_WHISPER_LANG
             result = mlx_whisper.transcribe(
