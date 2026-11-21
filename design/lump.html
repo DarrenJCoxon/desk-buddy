@@ -126,6 +126,15 @@ textarea::placeholder { color: #5E687B; }
 .primary { font: 600 14px/1 var(--font-body); background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 10px; padding: 11px 16px; cursor: pointer; }
 .status { font-size: 13px; color: var(--muted); }
 #copyFallback { min-height: 70px; font-family: var(--font-mono); font-size: 12px; }
+body.widget { background: #000; margin: 0; overflow: hidden; user-select: none; -webkit-user-select: none; }
+body.widget .wrap { padding: 0; max-width: none; margin: 0; }
+body.widget header, body.widget #gags, body.widget .transport, body.widget .side, body.widget .panel, body.widget #counter { display: none !important; }
+body.widget .desk { display: block; gap: 0; }
+body.widget .main-stage { position: static; width: 100vw; height: 100vh; }
+body.widget .stage { width: 100vw; height: 100vh; border-radius: 0; border: 0; background: #000; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+body.widget .stage canvas { width: 100vw !important; height: 100vh !important; max-width: none; }
+body.widget #bigChip { bottom: 8px; left: 50%; transform: translateX(-50%); top: auto; font-size: 11px; padding: 3px 9px; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+body.widget .stage:hover #bigChip { opacity: 0.9; }
 </style>
 
 <div class="wrap">
@@ -2392,10 +2401,12 @@ function loop(now) {
   }
   chip.textContent = label; chip.classList.toggle('alert', label === 'Needs you' || label === 'Waiting too long');
   counter.textContent = `${a.id} · ${held === null && cur.kind !== 'loop' ? (cur.kind === 'clip' ? 'event' : 'transition') : 'drawing'} ${a.i + 1}/${n}`;
-  loopThumbs.forEach((t, i) => t.b.classList.toggle('on', (held !== null || cur.kind === 'loop') && i === a.i));
-  transThumbs.forEach((t, i) => t.b.classList.toggle('on', held === null && cur.kind !== 'loop' && cur.key === sheetKey && i === a.i));
-  minis.forEach(x => { const m = at(x.m, globalTick); render(x.c, x.m, m.id, globalTick); });
-  gagStep();
+  if (!IS_WIDGET) {
+    loopThumbs.forEach((t, i) => t.b.classList.toggle('on', (held !== null || cur.kind === 'loop') && i === a.i));
+    transThumbs.forEach((t, i) => t.b.classList.toggle('on', held === null && cur.kind !== 'loop' && cur.key === sheetKey && i === a.i));
+    minis.forEach(x => { const m = at(x.m, globalTick); render(x.c, x.m, m.id, globalTick); });
+    gagStep();
+  }
 }
 
 // ---------- tap gag gallery ----------
@@ -2453,6 +2464,48 @@ if (['localhost', '127.0.0.1'].includes(location.hostname)) {
       stamp = m;
     } catch (e) {}
   }, 1200);
+}
+const IS_WIDGET = new URLSearchParams(location.search).get('widget') === '1';
+if (IS_WIDGET) {
+  document.body.classList.add('widget');
+  const stageEl = document.querySelector('.stage');
+  window.__lumpWidgetTap = () => {
+    const m = cur.kind === 'loop' ? cur.key : target;
+    const r = m === 'night' ? 'startle' : (m === 'meeting' || meetingSoon) ? 'prep' : pickTap();
+    const clip = CLIPS[`tap_${r}_${m}`] ? `tap_${r}_${m}` : `tap_${r}_${BASE[m]}`;
+    if (clip && CLIPS[clip]) {
+      playEvent(clip);
+      fetch('/sound', { method: 'POST', body: 'play ' + clip }).catch(() => {});
+    }
+  };
+  stageEl.addEventListener('click', () => window.__lumpWidgetTap());
+  let lastMood = null, voiceOverride = null;
+  window.__lumpSetVoiceMood = (m) => {
+    voiceOverride = m || null;
+    if (voiceOverride && MOMENTS.includes(voiceOverride)) {
+      setMoment(voiceOverride);
+    } else if (lastMood && MOMENTS.includes(lastMood)) {
+      setMoment(lastMood);
+    }
+  };
+  async function pollBridge() {
+    try {
+      const r = await fetch('/status', { cache: 'no-store' });
+      if (!r.ok) return;
+      const st = await r.json();
+      if (st.colour) {
+        const hex = '#' + String(st.colour).replace(/^#/, '');
+        if (hex !== tint) { tint = hex; document.body.style.setProperty('--glow', hex + '55'); }
+      }
+      const m = st.mood || 'idle';
+      if (m !== lastMood && MOMENTS.includes(m)) {
+        lastMood = m;
+        if (!voiceOverride) setMoment(m);
+      }
+    } catch {}
+  }
+  pollBridge();
+  setInterval(pollBridge, 500);
 }
 requestAnimationFrame(loop);
 })();

@@ -1007,8 +1007,9 @@ class Buddy:
         return max(fr) if fr else None
 
     def colour(self, now):
-        """Meeting countdown beats the usage gauge, which beats plain Tangerine."""
-        base = DEFAULT_COLOUR
+        """Meeting countdown beats the usage gauge, which beats config.json colour or plain Tangerine."""
+        cfg_col = (read_config().get("colour") or "").strip().lstrip("#").upper()
+        base = cfg_col if len(cfg_col) == 6 and all(c in "0123456789ABCDEF" for c in cfg_col) else DEFAULT_COLOUR
         frac = self.usage_frac(now)
         if frac is not None:
             base = usage_colour(round(frac * 50) / 50)      # 2% steps: no flicker
@@ -1482,12 +1483,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._reply(404)
 
     def do_GET(self):
-        if self.path == "/status":
+        path = self.path.split("?", 1)[0]
+        if path == "/status":
             self._reply(200, json.dumps(buddy.status(), indent=2).encode(), "application/json")
-        elif self.path == "/sound":
+        elif path == "/sound":
             self._reply(200, json.dumps(buddy.sounds.settings(), indent=2).encode(), "application/json")
-        elif self.path == "/play":
+        elif path == "/play":
             self._reply(200, json.dumps(list(ANIMATIONS)).encode(), "application/json")
+        elif path == "/widget":
+            html_path = os.path.join(HOME, "lump.html")
+            if not os.path.exists(html_path):
+                html_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "design", "lump.html")
+            if os.path.exists(html_path):
+                with open(html_path, "rb") as f:
+                    self._reply(200, f.read(), "text/html; charset=utf-8")
+            else:
+                self._reply(404, b"lump.html not found")
         else:
             self._reply(404)
 

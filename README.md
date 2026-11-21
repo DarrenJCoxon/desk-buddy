@@ -1,5 +1,7 @@
 # Lump, a desk buddy for Claude
 
+> **Google Antigravity, Local Voice & Meeting Notes:** Using Google Antigravity / Gemini instead of Claude, or want the floating **LumpDesk** virtual prism, \$0/month local dictation (`mlx-whisper`), Kokoro neural TTS, and zero-bot meeting notes? See **[GOOGLE_ANTIGRAVITY.md](GOOGLE_ANTIGRAVITY.md)**.
+
 <img src="design/media/lump-dance.gif" alt="Lump, an orange blob with a curly cowlick, dancing in sunglasses under a disco ball inside the glass cube display" width="240" align="right">
 
 Lump is a little blob who lives in a tiny glass prism display on your desk and shows
