@@ -102,6 +102,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
     var levelBarBg: NSView!
     var levelBarFill: NSView!
     var statusItem: NSStatusItem!
+    var notchWindow: NSPanel?
+    var notchIconView: NSImageView?
     var alwaysOnTop = true
     var prismVisible = true
     var currentSize: CGFloat = 180
@@ -222,7 +224,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         window.backgroundColor = .clear
         window.hasShadow = true
         window.level = .floating
-        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         window.isMovable = false
 
         let container = NSView(frame: NSRect(origin: .zero, size: rect.size))
@@ -286,6 +288,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         window.contentView = container
         window.makeKeyAndOrderFront(nil)
         setupMenuBarItem()
+        setupNotchWing()
         registerGlobalHotKey()
 
         NotificationCenter.default.addObserver(
@@ -392,27 +395,93 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
     private func updateMenuBarIcon() {
         guard let btn = statusItem?.button else { return }
         if isRecording {
-            btn.image = NSImage(systemSymbolName: "record.circle.fill", accessibilityDescription: "Lump Listening")
-            btn.image?.isTemplate = false
+            let img = NSImage(systemSymbolName: "record.circle.fill", accessibilityDescription: "Lump Listening")
+            img?.isTemplate = false
+            btn.image = img
             btn.contentTintColor = .systemRed
+            notchIconView?.image = img
+            notchIconView?.contentTintColor = .systemRed
         } else if meetingRecorder.isActive {
-            btn.image = NSImage(systemSymbolName: "waveform.circle.fill", accessibilityDescription: "Lump Recording Meeting")
-            btn.image?.isTemplate = false
+            let img = NSImage(systemSymbolName: "waveform.circle.fill", accessibilityDescription: "Lump Recording Meeting")
+            img?.isTemplate = false
+            btn.image = img
             btn.contentTintColor = .systemPurple
+            notchIconView?.image = img
+            notchIconView?.contentTintColor = .systemPurple
         } else {
-            if let icon = loadMenuIcon() {
+            let icon = loadMenuIcon()
+            if let icon = icon {
                 btn.image = icon
                 btn.title = ""
+                notchIconView?.image = icon
             } else {
                 btn.image = nil
                 btn.title = "Lump"
             }
             btn.contentTintColor = nil
+            notchIconView?.contentTintColor = nil
         }
+    }
+
+    private func setupNotchWing() {
+        notchWindow?.orderOut(nil)
+        notchWindow = nil
+        notchIconView = nil
+
+        // Find a notched MacBook screen (safeAreaInsets.top > 0)
+        guard #available(macOS 12.0, *),
+              let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }),
+              let rightArea = screen.auxiliaryTopRightArea else { return }
+
+        let h = screen.safeAreaInsets.top
+        let w: CGFloat = 34
+        let overlap: CGFloat = 10
+        let rect = NSRect(x: rightArea.minX - overlap, y: screen.frame.maxY - h, width: w + overlap, height: h)
+
+        let panel = NSPanel(
+            contentRect: rect,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.mainMenuWindow)) + 1)
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+
+        let bg = NSView(frame: NSRect(origin: .zero, size: rect.size))
+        bg.wantsLayer = true
+        bg.layer?.backgroundColor = NSColor.black.cgColor
+        bg.layer?.cornerRadius = 8
+        bg.layer?.maskedCorners = [.layerMaxXMinYCorner]
+
+        let iv = NSImageView(frame: NSRect(x: overlap + 6, y: (h - 20) / 2, width: 20, height: 20))
+        iv.image = loadMenuIcon()
+        iv.imageScaling = .scaleProportionallyUpOrDown
+        bg.addSubview(iv)
+
+        let clicker = DragOverlayView(frame: bg.bounds)
+        clicker.onClick = { [weak self] in
+            guard let self = self, let view = self.notchWindow?.contentView else { return }
+            let m = self.buildContextMenu()
+            m.popUp(positioning: nil, at: NSPoint(x: overlap, y: 0), in: view)
+        }
+        clicker.onRightClick = { [weak self] ev in
+            guard let self = self, let view = self.notchWindow?.contentView else { return }
+            NSMenu.popUpContextMenu(self.buildContextMenu(), with: ev, for: view)
+        }
+        bg.addSubview(clicker)
+
+        panel.contentView = bg
+        panel.orderFrontRegardless()
+        notchWindow = panel
+        notchIconView = iv
     }
 
     @objc func screensChanged() {
         ensureWindowOnScreen()
+        setupNotchWing()
     }
 
     private func ensureWindowOnScreen() {
