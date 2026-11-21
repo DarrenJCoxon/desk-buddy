@@ -117,6 +117,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
     private var lastTranscript = ""
     private var lastReply = ""
     private var voiceState = "idle"
+    private var currentColourHex = "4285F4"
+    private var cachedIconHex = ""
+    private var cachedMenuIcon: NSImage?
     private var activeMicName = ""
     private let meetingRecorder = MeetingRecorder()
     private var autoRecordedStarts: Set<Int> = []
@@ -325,8 +328,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
 
         URLSession.shared.dataTask(with: BRIDGE_STATUS_URL) { [weak self] data, _, _ in
             guard let self = self, let data = data,
-                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let mtg = obj["next_meeting"] as? [String: Any],
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+            if let col = obj["colour"] as? String, !col.isEmpty, col != self.currentColourHex {
+                self.currentColourHex = col
+                DispatchQueue.main.async { self.updateMenuBarIcon() }
+            }
+            guard let mtg = obj["next_meeting"] as? [String: Any],
                   let start = mtg["start"] as? TimeInterval else { return }
             let startKey = Int(start)
             guard !self.autoRecordedStarts.contains(startKey) else { return }
@@ -344,12 +351,77 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         }.resume()
     }
 
-    private func loadMenuIcon() -> NSImage? {
-        if let url = Bundle.main.url(forResource: "menuicon", withExtension: "png"),
-           let img = NSImage(contentsOf: url) {
-            img.size = NSSize(width: 18, height: 18)
-            img.isTemplate = false
-            return img
+    private func loadPixels(_ url: URL) -> (px: [UInt8], w: Int, h: Int)? {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let img = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return nil }
+        let w = img.width, h = img.height
+        var buf = [UInt8](repeating: 0, count: w * h * 4)
+        let ok = buf.withUnsafeMutableBytes { p -> Bool in
+            guard let ctx = CGContext(data: p.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.draw(img, in: CGRect(x: 0, y: 0, width: w, height: h))
+            return true
+        }
+        return ok ? (buf, w, h) : nil
+    }
+
+    private func renderLumpIcon(hex: String, targetSize: CGFloat) -> NSImage? {
+        guard let kURL = Bundle.main.url(forResource: "awake-glow-k", withExtension: "png"),
+              let wURL = Bundle.main.url(forResource: "awake-glow-w", withExtension: "png"),
+              let k = loadPixels(kURL), let w = loadPixels(wURL), k.w == w.w, k.h == w.h else { return nil }
+        let v = Int(hex.trimmingCharacters(in: CharacterSet(charactersIn: "#")), radix: 16) ?? 0x4285F4
+        let cr = (v >> 16) & 255, cg = (v >> 8) & 255, cb = v & 255
+        // Frame 0 is a square of size h x h at the left end of the strip
+        let side = k.h
+        var out = [UInt8](repeating: 0, count: side * side * 4)
+        var minX = side, maxX = 0, minY = side, maxY = 0
+        for y in 0..<side {
+            for x in 0..<side {
+                let si = (y * k.w + x) * 4
+                let di = (y * side + x) * 4
+                let kr = Int(k.px[si]), kg = Int(k.px[si + 1]), kb = Int(k.px[si + 2])
+                let wr = Int(w.px[si]), wg = Int(w.px[si + 1]), wb = Int(w.px[si + 2])
+                let a = k.px[si + 3]
+                out[di]     = UInt8(max(0, min(255, kr + (wr - kr) * cr / 255)))
+                out[di + 1] = UInt8(max(0, min(255, kg + (wg - kg) * cg / 255)))
+                out[di + 2] = UInt8(max(0, min(255, kb + (wb - kb) * cb / 255)))
+                out[di + 3] = a
+                if a > 20 {
+                    if x < minX { minX = x }; if x > maxX { maxX = x }
+                    if y < minY { minY = y }; if y > maxY { maxY = y }
+                }
+            }
+        }
+        guard let prov = CGDataProvider(data: Data(out) as CFData),
+              let full = CGImage(width: side, height: side, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: side * 4,
+                                 space: CGColorSpaceCreateDeviceRGB(),
+                                 bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                                 provider: prov, decode: nil, shouldInterpolate: true, intent: .defaultIntent) else { return nil }
+        // Tight crop around Lump's body so he looks big & crisp in the notch/menu bar
+        let pad = 2
+        let cx = max(0, minX - pad), cy = max(0, minY - pad)
+        let cw = min(side - cx, (maxX - minX + 1) + pad * 2)
+        let ch = min(side - cy, (maxY - minY + 1) + pad * 2)
+        let cropRect = (maxX > minX && maxY > minY) ? CGRect(x: cx, y: cy, width: cw, height: ch) : CGRect(x: 0, y: 0, width: side, height: side)
+        let cropped = full.cropping(to: cropRect) ?? full
+        let img = NSImage(cgImage: cropped, size: NSSize(width: targetSize, height: targetSize))
+        img.isTemplate = false
+        return img
+    }
+
+    private func loadMenuIcon(size: CGFloat = 20) -> NSImage? {
+        if cachedIconHex == currentColourHex, let cached = cachedMenuIcon {
+            let copy = cached.copy() as? NSImage ?? cached
+            copy.size = NSSize(width: size, height: size)
+            return copy
+        }
+        if let painted = renderLumpIcon(hex: currentColourHex, targetSize: 32) {
+            cachedIconHex = currentColourHex
+            cachedMenuIcon = painted
+            let copy = painted.copy() as? NSImage ?? painted
+            copy.size = NSSize(width: size, height: size)
+            return copy
         }
         let sym = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "Lump")
         sym?.isTemplate = true
@@ -409,11 +481,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
             notchIconView?.image = img
             notchIconView?.contentTintColor = .systemPurple
         } else {
-            let icon = loadMenuIcon()
-            if let icon = icon {
-                btn.image = icon
+            let menuIcon = loadMenuIcon(size: 20)
+            let notchIcon = loadMenuIcon(size: 30)
+            if let menuIcon = menuIcon {
+                btn.image = menuIcon
                 btn.title = ""
-                notchIconView?.image = icon
+                notchIconView?.image = notchIcon
             } else {
                 btn.image = nil
                 btn.title = "Lump"
@@ -434,8 +507,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
               let rightArea = screen.auxiliaryTopRightArea else { return }
 
         let h = screen.safeAreaInsets.top
-        let w: CGFloat = 34
-        let overlap: CGFloat = 10
+        let w: CGFloat = 40
+        let overlap: CGFloat = 12
         let rect = NSRect(x: rightArea.minX - overlap, y: screen.frame.maxY - h, width: w + overlap, height: h)
 
         let panel = NSPanel(
@@ -453,11 +526,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         let bg = NSView(frame: NSRect(origin: .zero, size: rect.size))
         bg.wantsLayer = true
         bg.layer?.backgroundColor = NSColor.black.cgColor
-        bg.layer?.cornerRadius = 8
+        bg.layer?.cornerRadius = 10
         bg.layer?.maskedCorners = [.layerMaxXMinYCorner]
 
-        let iv = NSImageView(frame: NSRect(x: overlap + 6, y: (h - 20) / 2, width: 20, height: 20))
-        iv.image = loadMenuIcon()
+        let iconSide = min(h - 6, 30)
+        let iv = NSImageView(frame: NSRect(x: overlap + (w - iconSide) / 2, y: (h - iconSide) / 2, width: iconSide, height: iconSide))
+        iv.image = loadMenuIcon(size: iconSide)
         iv.imageScaling = .scaleProportionallyUpOrDown
         bg.addSubview(iv)
 

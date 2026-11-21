@@ -14,6 +14,10 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BUILD/LumpDesk" "$APP/Contents/MacOS/LumpDesk"
 
+if [ -f "$ROOT/tools/lumpbar/frames/awake-glow-k.png" ] && [ -f "$ROOT/tools/lumpbar/frames/awake-glow-w.png" ]; then
+  cp "$ROOT/tools/lumpbar/frames/awake-glow-k.png" "$APP/Contents/Resources/awake-glow-k.png"
+  cp "$ROOT/tools/lumpbar/frames/awake-glow-w.png" "$APP/Contents/Resources/awake-glow-w.png"
+fi
 if [ -f "$ROOT/tools/lumpbar/icon.png" ]; then
   cp "$ROOT/tools/lumpbar/icon.png" "$APP/Contents/Resources/menuicon.png"
   ICONSET="$BUILD/LumpDesk.iconset"; mkdir -p "$ICONSET"
