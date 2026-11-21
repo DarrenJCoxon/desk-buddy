@@ -94,7 +94,7 @@ final class MicButton: NSButton {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRecordingDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRecordingDelegate, NSMenuDelegate {
     var window: NSWindow!
     var webView: WKWebView!
     var micButton: MicButton!
@@ -346,11 +346,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         if let btn = statusItem.button {
             btn.image = NSImage(systemSymbolName: "sparkle", accessibilityDescription: "Lump")
             btn.image?.isTemplate = true
-            btn.target = self
-            btn.action = #selector(menuBarClicked)
-            btn.sendAction(on: [.leftMouseUp, .rightMouseUp])
             btn.toolTip = "Lump — Click for all actions (⌥ ⌥ to dictate)"
         }
+        let barMenu = NSMenu()
+        barMenu.delegate = self
+        statusItem.menu = barMenu
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        for item in buildContextMenu().items {
+            item.menu?.removeItem(item)
+            menu.addItem(item)
+        }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !prismVisible {
+            togglePrismVisible()
+        } else {
+            ensureWindowOnScreen()
+            window.orderFront(nil)
+        }
+        return true
     }
 
     private func updateMenuBarIcon() {
@@ -368,13 +386,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
             btn.image?.isTemplate = true
             btn.contentTintColor = nil
         }
-    }
-
-    @objc func menuBarClicked() {
-        let menu = buildContextMenu()
-        statusItem.menu = menu
-        statusItem.button?.performClick(nil)
-        statusItem.menu = nil
     }
 
     @objc func screensChanged() {
