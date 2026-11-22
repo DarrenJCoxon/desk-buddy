@@ -78,6 +78,33 @@ def load_pa_context() -> str:
     return "\n\n".join(parts)
 
 
+def open_on_mac(target: str) -> str:
+    """Instantly open a URL, file path, or macOS application on Darren's desktop."""
+    t = (target or "").strip()
+    if not t:
+        return "Nothing specified to open."
+    try:
+        if t.startswith(("http://", "https://")):
+            subprocess.Popen(["open", t])
+            return f"Opened {t} in your default browser."
+        expanded = os.path.expanduser(t)
+        if os.path.exists(expanded):
+            subprocess.Popen(["open", expanded])
+            return f"Opened {expanded}."
+        # Try opening as a macOS application name
+        res = subprocess.run(["open", "-a", t], capture_output=True, text=True)
+        if res.returncode == 0:
+            return f"Opened application {t}."
+        # Fallback: treat as domain if it looks like a URL without scheme
+        if "." in t and " " not in t:
+            url = f"https://{t}"
+            subprocess.Popen(["open", url])
+            return f"Opened {url} in your default browser."
+        return f"Could not open '{t}': {res.stderr.strip()}"
+    except Exception as e:
+        return f"Failed to open '{t}': {e}"
+
+
 def run_antigravity_task(instruction: str) -> str:
     """Delegate real PA / coding actions to Antigravity CLI (`agy --mode auto`)."""
     cli = (
@@ -135,11 +162,29 @@ async def run_live_session():
         types.Tool(
             function_declarations=[
                 types.FunctionDeclaration(
+                    name="open_on_mac",
+                    description=(
+                        "Instantly open a webpage URL (https://...), local file path, or macOS app directly "
+                        "on Darren's desktop. ALWAYS use this tool immediately whenever Darren asks to open a "
+                        "website, link, document, folder, or application."
+                    ),
+                    parameters=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "target": types.Schema(
+                                type=types.Type.STRING,
+                                description="Full URL (e.g. https://calendar.google.com), file path (e.g. ~/Documents/Lump-PA/today.md), or macOS app name (e.g. Notion).",
+                            )
+                        },
+                        required=["target"],
+                    ),
+                ),
+                types.FunctionDeclaration(
                     name="run_pa_task",
                     description=(
-                        "Execute a real action on Darren's Mac via Antigravity: open apps/URLs/files, "
-                        "check Google Calendar or Gmail, stage email drafts, create meeting/training prep briefs "
-                        "in ~/Documents/Lump-PA/prep/, update today.md or inbox.md, or run coding/CI tasks."
+                        "Execute a multi-step PA or coding task via Antigravity: update today.md or inbox.md, "
+                        "create a meeting/training prep brief in ~/Documents/Lump-PA/prep/, search local files, "
+                        "or run coding/CI tasks."
                     ),
                     parameters=types.Schema(
                         type=types.Type.OBJECT,
@@ -151,7 +196,7 @@ async def run_live_session():
                         },
                         required=["instruction"],
                     ),
-                )
+                ),
             ]
         )
     ]
@@ -228,7 +273,20 @@ async def run_live_session():
                                     out_stream.write(data)
                         if msg.tool_call:
                             for fc in msg.tool_call.function_calls:
-                                if fc.name == "run_pa_task":
+                                if fc.name == "open_on_mac":
+                                    target = (fc.args or {}).get("target", "")
+                                    print(f"[Lump] Opening: {target}", flush=True)
+                                    result = open_on_mac(target)
+                                    await session.send_tool_response(
+                                        function_responses=[
+                                            types.FunctionResponse(
+                                                id=fc.id,
+                                                name=fc.name,
+                                                response={"result": result},
+                                            )
+                                        ]
+                                    )
+                                elif fc.name == "run_pa_task":
                                     instr = (fc.args or {}).get("instruction", "")
                                     print(f"[Lump PA] Running: {instr}", flush=True)
                                     result = await asyncio.to_thread(run_antigravity_task, instr)
