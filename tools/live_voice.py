@@ -158,12 +158,14 @@ async def run_live_session():
 
     pa_snapshot = load_pa_context()
     sys_text = (
-        "You are Lump, Darren's warm, sharp, conversational Executive PA living on his desk. "
+        "You are Lump, Darren's warm, sharp, conversational Executive PA and thought-partner living on his desk. "
         f"Current local time: {time.strftime('%A %d %B %Y, %H:%M')}. "
-        "Speak naturally and concisely like a real human colleague. "
-        "You already have Darren's current schedule, watch-outs, and priorities below — answer schedule and task questions immediately from it. "
-        "Whenever Darren asks you to open an app/URL/file, update today.md or inbox.md, create a prep sheet in prep/, "
-        "or run a coding/CI task, call the `run_pa_task` tool and tell him briefly while you do it.\n\n"
+        "Chat naturally like a smart, trusted colleague — you can brainstorm ideas, help Darren think through "
+        "presentations, training sessions, strategy, or tough decisions, ask good follow-up questions, and keep "
+        "the conversation flowing effortlessly. "
+        "You also have Darren's current schedule, watch-outs, and priorities below — answer schedule and task questions immediately from it. "
+        "Only call `run_pa_task` when Darren explicitly asks you to take an action on his Mac (open a file/URL/app, "
+        "edit today.md or inbox.md, write a prep sheet in prep/, or run a coding/CI task).\n\n"
         + pa_snapshot
     )
 
@@ -197,7 +199,7 @@ async def run_live_session():
     in_stream.start()
 
     started = time.time()
-    mute_mic_until = 0.0
+    playing_until = 0.0
     print(f"Lump Live Voice connected ({model}, voice={voice}). Speak naturally — Ctrl+C to stop.")
     post_hook("SessionStart")
 
@@ -206,22 +208,22 @@ async def run_live_session():
             async def send_audio():
                 while True:
                     pcm = await in_q.get()
-                    # Suppress speaker-to-mic acoustic echo while Lump is speaking on laptop speakers
-                    if time.time() < mute_mic_until:
+                    # Flat 0.25s tail after playback finishes (never accumulates per chunk)
+                    if time.time() < playing_until + 0.25:
                         continue
                     await session.send_realtime_input(
                         audio=types.Blob(data=pcm, mime_type="audio/pcm;rate=16000")
                     )
 
             async def recv_loop():
-                nonlocal mute_mic_until
+                nonlocal playing_until
                 async for msg in session.receive():
                     if msg.server_content and msg.server_content.model_turn:
                         for part in msg.server_content.model_turn.parts:
                             if part.inline_data and part.inline_data.data:
                                 data = part.inline_data.data
                                 dur = len(data) / float(OUTPUT_RATE * 2)
-                                mute_mic_until = max(mute_mic_until, time.time()) + dur + 0.35
+                                playing_until = max(playing_until, time.time()) + dur
                                 out_stream.write(data)
                     if msg.tool_call:
                         for fc in msg.tool_call.function_calls:
