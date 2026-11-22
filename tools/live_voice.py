@@ -217,29 +217,30 @@ async def run_live_session():
 
             async def recv_loop():
                 nonlocal playing_until
-                async for msg in session.receive():
-                    if msg.server_content and msg.server_content.model_turn:
-                        for part in msg.server_content.model_turn.parts:
-                            if part.inline_data and part.inline_data.data:
-                                data = part.inline_data.data
-                                dur = len(data) / float(OUTPUT_RATE * 2)
-                                playing_until = max(playing_until, time.time()) + dur
-                                out_stream.write(data)
-                    if msg.tool_call:
-                        for fc in msg.tool_call.function_calls:
-                            if fc.name == "run_pa_task":
-                                instr = (fc.args or {}).get("instruction", "")
-                                print(f"[Lump PA] Running: {instr}", flush=True)
-                                result = await asyncio.to_thread(run_antigravity_task, instr)
-                                await session.send_tool_response(
-                                    function_responses=[
-                                        types.FunctionResponse(
-                                            id=fc.id,
-                                            name=fc.name,
-                                            response={"result": result},
-                                        )
-                                    ]
-                                )
+                while True:
+                    async for msg in session.receive():
+                        if msg.server_content and msg.server_content.model_turn:
+                            for part in msg.server_content.model_turn.parts:
+                                if part.inline_data and part.inline_data.data:
+                                    data = part.inline_data.data
+                                    dur = len(data) / float(OUTPUT_RATE * 2)
+                                    playing_until = max(playing_until, time.time()) + dur
+                                    out_stream.write(data)
+                        if msg.tool_call:
+                            for fc in msg.tool_call.function_calls:
+                                if fc.name == "run_pa_task":
+                                    instr = (fc.args or {}).get("instruction", "")
+                                    print(f"[Lump PA] Running: {instr}", flush=True)
+                                    result = await asyncio.to_thread(run_antigravity_task, instr)
+                                    await session.send_tool_response(
+                                        function_responses=[
+                                            types.FunctionResponse(
+                                                id=fc.id,
+                                                name=fc.name,
+                                                response={"result": result},
+                                            )
+                                        ]
+                                    )
 
             await asyncio.gather(send_audio(), recv_loop())
     except (KeyboardInterrupt, asyncio.CancelledError):
