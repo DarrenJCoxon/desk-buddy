@@ -312,9 +312,14 @@ class VoiceCoordinator:
         """Run via installed `agy` or `gemini` CLI (uses Google AI Ultra OAuth login at $0 extra)."""
         cfg = read_config()
         workspace = os.path.expanduser(cfg.get("voice_workspace") or os.getcwd())
-        cli = shutil.which("agy") or shutil.which("gemini")
+        cli = (
+            shutil.which("agy")
+            or (os.path.expanduser("~/.local/bin/agy") if os.path.exists(os.path.expanduser("~/.local/bin/agy")) else None)
+            or ("/opt/homebrew/bin/agy" if os.path.exists("/opt/homebrew/bin/agy") else None)
+            or shutil.which("gemini")
+        )
         if not cli:
-            raise RuntimeError("Neither `agy` nor `gemini` CLI found, and no GEMINI_API_KEY is set.")
+            raise RuntimeError("Antigravity CLI (`agy`) not found. Install via `brew install --cask antigravity-cli`.")
 
         # Include brief rolling context from recent voice turns
         ctx_lines = [SYSTEM_PROMPT, ""]
