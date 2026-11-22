@@ -467,9 +467,8 @@
         <span class="header-meta" id="clock">Live</span>
       </div>
       <div class="header-actions">
-        <button class="btn primary" id="mtgBtn" onclick="toggleMeeting()">Start Meeting</button>
-        <button class="btn" onclick="readBriefing()">Read Briefing</button>
-        <button class="btn ghost" onclick="stopSpeaking()">Stop Voice</button>
+        <button class="btn primary" id="liveBtn" onclick="toggleLiveVoice()">Live Voice</button>
+        <button class="btn" id="mtgBtn" onclick="toggleMeeting()">Start Meeting</button>
         <button class="btn ghost" onclick="refresh()" title="Refresh">Refresh</button>
         <button class="btn ghost" id="themeBtn" onclick="toggleTheme()">Dark</button>
       </div>
@@ -723,11 +722,27 @@ function render(data) {
   const sessions = (data.bridge_status && data.bridge_status.sessions) || {};
   const activeSessions = Object.entries(sessions).filter(([, s]) => s.state === 'working' || s.state === 'alert');
   const mActive = data.voice_status && data.voice_status.meeting && data.voice_status.meeting.active;
+  const live = (data.voice_status && data.voice_status.live_voice) || { active: false, duration_s: 0 };
+
+  const liveBtn = document.getElementById('liveBtn');
+  if (live.active) {
+    const mins = Math.floor((live.duration_s || 0) / 60);
+    const secs = String((live.duration_s || 0) % 60).padStart(2, '0');
+    liveBtn.textContent = `End Live (${mins}:${secs})`;
+    liveBtn.className = 'btn danger';
+  } else {
+    liveBtn.textContent = 'Live Voice';
+    liveBtn.className = 'btn primary';
+  }
+
   const mtgBtn = document.getElementById('mtgBtn');
   mtgBtn.textContent = mActive ? 'Stop Meeting' : 'Start Meeting';
-  mtgBtn.className = mActive ? 'btn danger' : 'btn primary';
+  mtgBtn.className = mActive ? 'btn danger' : 'btn';
 
-  if (mActive) {
+  if (live.active) {
+    document.getElementById('inProgressVal').textContent = 'Live Voice active';
+    document.getElementById('inProgressSub').textContent = 'Hands-free Gemini Live conversation';
+  } else if (mActive) {
     document.getElementById('inProgressVal').textContent = 'Recording: ' + (data.voice_status.meeting.title || 'Meeting');
     document.getElementById('inProgressSub').textContent = `${data.voice_status.meeting.lines || 0} transcript chunks`;
   } else if (activeSessions.length) {
@@ -892,6 +907,10 @@ async function askLump(e) {
 }
 async function setColour(hex) {
   await fetch('/api/colour', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ colour: hex }) });
+}
+async function toggleLiveVoice() {
+  await fetch('/api/live/toggle', { method: 'POST' });
+  setTimeout(refresh, 350);
 }
 async function toggleMeeting() {
   const active = stateData && stateData.voice_status && stateData.voice_status.meeting && stateData.voice_status.meeting.active;

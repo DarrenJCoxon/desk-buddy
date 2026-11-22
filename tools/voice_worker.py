@@ -112,6 +112,9 @@ class VoiceCoordinator:
         self._history: list[tuple[str, str]] = []
         self._meeting: dict | None = None
         self._meeting_lock = threading.Lock()
+        self._live_proc: subprocess.Popen | None = None
+        self._live_started: float = 0.0
+        self._live_lock = threading.Lock()
 
         # Dedicated background asyncio event loop for the Antigravity SDK (when API key is used)
         self._loop = asyncio.new_event_loop()
@@ -136,11 +139,59 @@ class VoiceCoordinator:
         k = self._get_kokoro()
         return sorted(k.get_voices()) if k else []
 
+    def live_status(self) -> dict:
+        with self._live_lock:
+            alive = self._live_proc is not None and self._live_proc.poll() is None
+            if not alive:
+                self._live_proc = None
+                self._live_started = 0.0
+                return {"active": False, "duration_s": 0}
+            return {"active": True, "duration_s": int(time.time() - self._live_started)}
+
+    def live_start(self) -> dict:
+        with self._live_lock:
+            if self._live_proc is not None and self._live_proc.poll() is None:
+                return {"active": True, "duration_s": int(time.time() - self._live_started)}
+            script = os.path.join(HOME, "live_voice.py")
+            if not os.path.isfile(script):
+                script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "live_voice.py")
+            log_file = open(os.path.join(HOME, "live_voice.log"), "a", encoding="utf-8")
+            self._live_proc = subprocess.Popen(
+                [sys.executable, "-u", script],
+                cwd=PA_DIR,
+                stdout=log_file,
+                stderr=log_file,
+            )
+            self._live_started = time.time()
+            log.info("Started Gemini Live voice session (pid=%d)", self._live_proc.pid)
+            return {"active": True, "duration_s": 0}
+
+    def live_stop(self) -> dict:
+        with self._live_lock:
+            p = self._live_proc
+            self._live_proc = None
+            self._live_started = 0.0
+        if p and p.poll() is None:
+            try:
+                p.terminate()
+                p.wait(timeout=3)
+            except Exception:
+                try:
+                    p.kill()
+                except Exception:
+                    pass
+            log.info("Stopped Gemini Live voice session")
+        return {"active": False, "duration_s": 0}
+
+    def live_toggle(self) -> dict:
+        return self.live_stop() if self.live_status()["active"] else self.live_start()
+
     def status(self) -> dict:
         cfg = read_config()
         with self._meeting_lock:
             m = self._meeting
             meeting_info = {"active": True, "title": m["title"], "path": m["path"], "lines": m["lines"]} if m else {"active": False}
+        live_info = self.live_status()
         with self.lock:
             return {
                 "ok": True,
@@ -148,6 +199,7 @@ class VoiceCoordinator:
                 "session_id": self.session_id,
                 "voice": cfg.get("kokoro_voice") or DEFAULT_KOKORO_VOICE,
                 "meeting": meeting_info,
+                "live_voice": live_info,
                 "last_transcript": self.last_transcript,
                 "last_reply": self.last_reply,
                 "last_error": self.last_error,
@@ -829,6 +881,12 @@ class VoiceHandler(http.server.BaseHTTPRequestHandler):
                 self._reply(200, b'{"ok":true}')
             except Exception as e:
                 self._reply(400, json.dumps({"error": str(e)}).encode("utf-8"))
+        elif self.path == "/api/live/start":
+            self._reply(200, json.dumps(coord.live_start()).encode("utf-8"))
+        elif self.path == "/api/live/stop":
+            self._reply(200, json.dumps(coord.live_stop()).encode("utf-8"))
+        elif self.path == "/api/live/toggle":
+            self._reply(200, json.dumps(coord.live_toggle()).encode("utf-8"))
         elif self.path == "/api/prep":
             try:
                 data = json.loads(body.decode("utf-8") or "{}")
