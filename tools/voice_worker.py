@@ -39,6 +39,7 @@ DEFAULT_KOKORO_SPEED = 1.05
 KOKORO_DIR = os.path.join(HOME, "kokoro")
 PA_DIR = os.path.expanduser("~/Documents/Lump-PA")
 MEETINGS_DIR = os.path.join(PA_DIR, "meetings")
+PREP_DIR = os.path.join(PA_DIR, "prep")
 
 os.makedirs(HOME, exist_ok=True)
 logging.basicConfig(
@@ -326,7 +327,8 @@ class VoiceCoordinator:
     def _run_cli_turn(self, prompt: str) -> str:
         """Run via installed `agy` or `gemini` CLI (uses Google AI Ultra OAuth login at $0 extra)."""
         cfg = read_config()
-        workspace = os.path.expanduser(cfg.get("voice_workspace") or os.getcwd())
+        workspace = os.path.expanduser(cfg.get("voice_workspace") or PA_DIR)
+        os.makedirs(workspace, exist_ok=True)
         cli = (
             shutil.which("agy")
             or (os.path.expanduser("~/.local/bin/agy") if os.path.exists(os.path.expanduser("~/.local/bin/agy")) else None)
@@ -346,7 +348,7 @@ class VoiceCoordinator:
 
         cmd = [cli, "-p", full_prompt]
         if os.path.basename(cli) == "agy":
-            cmd = [cli, "--effort", "low", "-p", full_prompt]
+            cmd = [cli, "--mode", "auto", "--effort", "low", "-p", full_prompt]
         proc = subprocess.run(
             cmd,
             cwd=workspace,
@@ -495,6 +497,37 @@ class VoiceCoordinator:
             post_bridge_hook({"hook_event_name": "Stop", "session_id": sid})
             self.speak("Your meeting transcript is saved, though I couldn't run the AI summary yet. Make sure you're signed in to Gemini.")
 
+    def prep_meeting_bg(self, title: str) -> dict:
+        os.makedirs(PREP_DIR, exist_ok=True)
+        clean = (title or "Upcoming Session").strip()
+        slug = re.sub(r"[^a-z0-9]+", "-", clean.lower()).strip("-") or "session"
+        fname = f"{time.strftime('%Y-%m-%d')}-{slug}.md"
+        path = os.path.join(PREP_DIR, fname)
+        threading.Thread(target=self._run_prep, args=(clean, path, fname), daemon=True).start()
+        return {"started": True, "title": clean, "name": fname, "path": path}
+
+    def _run_prep(self, title: str, path: str, fname: str) -> None:
+        sid = f"prep-{uuid.uuid4().hex[:6]}"
+        try:
+            post_bridge_hook({"hook_event_name": "UserPromptSubmit", "session_id": sid, "cwd": PA_DIR})
+            self.set_state("working")
+            prompt = (
+                f"Prepare a crisp 1-page Meeting / Training Prep brief for: '{title}'. "
+                "Use Google Calendar and Gmail (read-only) plus any local files in ~/Documents/Lump-PA/ "
+                "to gather attendee context, recent email threads, and key objectives. "
+                f"Write the full Markdown brief directly to {path} with headings: "
+                "## Objective & Context, ## Key People & Recent Threads, ## Talking Points & Questions, ## Links & Materials. "
+                "Then reply with a 2-sentence spoken summary of the top things to keep in mind."
+            )
+            reply = self._run_agent(prompt)
+            post_bridge_hook({"hook_event_name": "Stop", "session_id": sid})
+            self._append_history(f"Prep: {title}", reply, mode="agent")
+            self.speak(reply or f"Your prep sheet for {title} is ready in the Nerve Centre.")
+        except Exception as e:
+            log.exception("prep failed")
+            self.set_state("idle", error=str(e))
+            post_bridge_hook({"hook_event_name": "Stop", "session_id": sid})
+
     def handle_request_bg(self, wav_bytes: bytes | None = None, text: str | None = None) -> None:
         threading.Thread(
             target=self._process,
@@ -577,11 +610,13 @@ def build_dashboard_payload() -> dict:
         pass
 
     meeting_notes = []
-    if os.path.isdir(MEETINGS_DIR):
-        for name in sorted(os.listdir(MEETINGS_DIR), reverse=True):
+    for folder, kind in ((MEETINGS_DIR, "meeting"), (PREP_DIR, "prep")):
+        if not os.path.isdir(folder):
+            continue
+        for name in sorted(os.listdir(folder), reverse=True):
             if not name.endswith(".md"):
                 continue
-            fpath = os.path.join(MEETINGS_DIR, name)
+            fpath = os.path.join(folder, name)
             title = name[:-3]
             try:
                 with open(fpath, "r", encoding="utf-8") as f:
@@ -590,13 +625,15 @@ def build_dashboard_payload() -> dict:
                         title = first[2:].strip()
                 st = os.stat(fpath)
                 meeting_notes.append({
-                    "name": name,
+                    "name": f"{kind}/{name}",
+                    "kind": kind,
                     "title": title,
                     "date": time.strftime("%a %d %b %H:%M", time.localtime(st.st_mtime)),
                     "size_kb": round(st.st_size / 1024.0, 1),
                 })
             except OSError:
                 pass
+    meeting_notes.sort(key=lambda x: x["name"], reverse=True)
 
     voice_history = []
     hp = os.path.join(HOME, "voice_history.jsonl")
@@ -670,13 +707,19 @@ class VoiceHandler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/dashboard":
             self._reply(200, json.dumps(build_dashboard_payload()).encode("utf-8"))
         elif path.startswith("/api/meeting/"):
-            fname = os.path.basename(urllib.request.unquote(path[len("/api/meeting/"):]))
-            fpath = os.path.join(MEETINGS_DIR, fname)
+            rel = urllib.request.unquote(path[len("/api/meeting/"):])
+            if rel.startswith("prep/"):
+                base_dir, fname = PREP_DIR, os.path.basename(rel[len("prep/"):])
+            elif rel.startswith("meeting/"):
+                base_dir, fname = MEETINGS_DIR, os.path.basename(rel[len("meeting/"):])
+            else:
+                base_dir, fname = MEETINGS_DIR, os.path.basename(rel)
+            fpath = os.path.join(base_dir, fname)
             if fname.endswith(".md") and os.path.isfile(fpath):
                 with open(fpath, "rb") as f:
                     self._reply(200, f.read(), "text/markdown; charset=utf-8")
             else:
-                self._reply(404, b"Meeting note not found", "text/plain")
+                self._reply(404, b"Note not found", "text/plain")
         elif path == "/health":
             self._reply(200, json.dumps(coord.status(), indent=2).encode("utf-8"))
         elif path == "/voices":
@@ -782,6 +825,13 @@ class VoiceHandler(http.server.BaseHTTPRequestHandler):
                         with open(p, "a", encoding="utf-8") as f:
                             f.write(f"\n- [ ] {text}")
                 self._reply(200, b'{"ok":true}')
+            except Exception as e:
+                self._reply(400, json.dumps({"error": str(e)}).encode("utf-8"))
+        elif self.path == "/api/prep":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+                res = coord.prep_meeting_bg(data.get("title", ""))
+                self._reply(202, json.dumps(res).encode("utf-8"))
             except Exception as e:
                 self._reply(400, json.dumps({"error": str(e)}).encode("utf-8"))
         elif self.path == "/api/voice/clear":

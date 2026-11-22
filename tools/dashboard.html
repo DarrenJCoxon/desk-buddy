@@ -692,6 +692,7 @@ function renderScheduleRows(items) {
         </div>
         <div class="cal-actions">
           ${joinBtn}
+          <button class="btn ghost" style="padding:3px 7px;font-size:11.5px" onclick="prepMeeting('${safeJsTitle}')">Prep</button>
           <button class="btn ghost" style="padding:3px 7px;font-size:11.5px" onclick="startNamedMeeting('${safeJsTitle}')">Record</button>
           <span class="tag ${w.soon ? 'soon' : ''}">${w.badge}</span>
         </div>
@@ -825,7 +826,7 @@ function render(data) {
           <div class="cal-title">${esc(n.title)}</div>
           <div class="cal-meta">${esc(n.date)} · ${n.size_kb} KB</div>
         </div>
-        <span class="tag">Open</span>
+        <span class="tag ${n.kind === 'prep' ? 'blue' : ''}">${n.kind === 'prep' ? 'Prep' : 'Notes'}</span>
       </div>
     `).join('');
 
@@ -896,6 +897,10 @@ async function toggleMeeting() {
   const active = stateData && stateData.voice_status && stateData.voice_status.meeting && stateData.voice_status.meeting.active;
   await fetch(active ? '/meeting/stop' : '/meeting/start', { method: 'POST', body: '{}' });
   setTimeout(refresh, 400);
+}
+async function prepMeeting(title) {
+  await fetch('/api/prep', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title }) });
+  setTimeout(refresh, 800);
 }
 async function startNamedMeeting(title) {
   await fetch('/meeting/start', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title }) });
