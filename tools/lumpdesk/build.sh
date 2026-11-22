@@ -7,7 +7,7 @@ APP="$HOME/Applications/LumpDesk.app"
 
 BUILD="$(mktemp -d)"
 trap 'rm -rf "$BUILD"' EXIT
-swiftc -O -swift-version 5 "$HERE/main.swift" "$HERE/MeetingRecorder.swift" -framework Cocoa -framework WebKit -framework AVFoundation -framework Carbon -framework ScreenCaptureKit -framework CoreMedia -o "$BUILD/LumpDesk"
+swiftc -O -swift-version 5 "$HERE/main.swift" "$HERE/MeetingRecorder.swift" -framework Cocoa -framework WebKit -framework AVFoundation -framework CoreAudio -framework Carbon -framework ScreenCaptureKit -framework CoreMedia -o "$BUILD/LumpDesk"
 
 pkill -x LumpDesk 2>/dev/null || true
 rm -rf "$APP"

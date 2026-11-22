@@ -247,6 +247,21 @@ class VoiceCoordinator:
             tmp_path = tmp.name
         try:
             log.info("received audio: %d bytes (%s)", len(audio_bytes), suffix)
+            # Quick silence check via ffmpeg so Whisper never hallucinates "Thank you." on muted/blocked mics
+            try:
+                vd = subprocess.run(
+                    ["ffmpeg", "-hide_banner", "-i", tmp_path, "-af", "volumedetect", "-f", "null", "-"],
+                    capture_output=True, text=True, timeout=5,
+                )
+                m = re.search(r"max_volume:\s*([-\d.]+)\s*dB", vd.stderr)
+                if m:
+                    max_db = float(m.group(1))
+                    log.info("audio max_volume=%.1f dB", max_db)
+                    if max_db < -55.0:
+                        log.warning("audio is silent (%.1f dB); skipping whisper", max_db)
+                        return ""
+            except Exception:
+                pass
             t0 = time.time()
             lang = cfg.get("whisper_language") or DEFAULT_WHISPER_LANG
             result = mlx_whisper.transcribe(
@@ -329,8 +344,11 @@ class VoiceCoordinator:
         ctx_lines.append(f"User: {prompt}")
         full_prompt = "\n".join(ctx_lines)
 
+        cmd = [cli, "-p", full_prompt]
+        if os.path.basename(cli) == "agy":
+            cmd = [cli, "--effort", "low", "-p", full_prompt]
         proc = subprocess.run(
-            [cli, "-p", full_prompt],
+            cmd,
             cwd=workspace,
             capture_output=True,
             text=True,

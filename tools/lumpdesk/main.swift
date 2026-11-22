@@ -6,6 +6,7 @@
 import AVFoundation
 import Carbon.HIToolbox
 import Cocoa
+import CoreAudio
 import WebKit
 
 let WIDGET_URL = URL(string: "http://127.0.0.1:47823/widget?widget=1")!
@@ -108,9 +109,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
     var prismVisible = true
     var currentSize: CGFloat = 180
 
-    private var captureSession: AVCaptureSession?
-    private var fileOutput: AVCaptureAudioFileOutput?
-    private var levelTimer: Timer?
+    private var audioEngine: AVAudioEngine?
+    private var audioFile: AVAudioFile?
+    private var audioFileLock = NSLock()
     private var recordingURL: URL?
     private var isRecording = false
     private var recordingMode = "dictate" // "dictate" (paste into active app) or "agent" (Lump runs & speaks)
@@ -665,6 +666,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         }
     }
 
+    private func audioDeviceID(forUID uid: String) -> AudioDeviceID? {
+        var propSize: UInt32 = 0
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &propSize) == noErr else { return nil }
+        let count = Int(propSize) / MemoryLayout<AudioDeviceID>.size
+        var devs = [AudioDeviceID](repeating: 0, count: count)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &propSize, &devs) == noErr else { return nil }
+        for dev in devs {
+            var uidAddr = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyDeviceUID,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            var cfUID: CFString = "" as CFString
+            var size = UInt32(MemoryLayout<CFString>.size)
+            if AudioObjectGetPropertyData(dev, &uidAddr, 0, nil, &size, &cfUID) == noErr,
+               (cfUID as String) == uid {
+                return dev
+            }
+        }
+        return nil
+    }
+
     private func beginRecording() {
         postSimple("\(VOICE_BASE)/stop_speaking")
 
@@ -673,61 +701,127 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
             return
         }
         activeMicName = mic.localizedName
-        NSLog("LumpDesk: recording with mic: \(activeMicName)")
+        NSLog("LumpDesk: recording with AVAudioEngine on mic: \(activeMicName)")
 
-        let session = AVCaptureSession()
+        let engine = AVAudioEngine()
+        let inputNode = engine.inputNode
+
+        // Bind the exact selected microphone (Shure or MacBook) to the input AudioUnit
+        if var devID = audioDeviceID(forUID: mic.uniqueID), let au = inputNode.audioUnit {
+            AudioUnitSetProperty(
+                au,
+                kAudioOutputUnitProperty_CurrentDevice,
+                kAudioUnitScope_Global,
+                0,
+                &devID,
+                UInt32(MemoryLayout<AudioDeviceID>.size)
+            )
+        }
+
+        let hwFormat = inputNode.outputFormat(forBus: 0)
+        guard hwFormat.sampleRate > 0 && hwFormat.channelCount > 0 else {
+            NSLog("LumpDesk: invalid input format (sr=\(hwFormat.sampleRate), ch=\(hwFormat.channelCount))")
+            return
+        }
+
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("lump_voice_\(UUID().uuidString).wav")
         do {
-            let input = try AVCaptureDeviceInput(device: mic)
-            guard session.canAddInput(input) else { return }
-            session.addInput(input)
+            let file = try AVAudioFile(forWriting: tmp, settings: hwFormat.settings)
+            audioFileLock.lock()
+            self.audioFile = file
+            audioFileLock.unlock()
 
-            let output = AVCaptureAudioFileOutput()
-            guard session.canAddOutput(output) else { return }
-            session.addOutput(output)
+            inputNode.installTap(onBus: 0, bufferSize: 2048, format: hwFormat) { [weak self] buffer, _ in
+                guard let self = self else { return }
+                self.audioFileLock.lock()
+                try? self.audioFile?.write(from: buffer)
+                self.audioFileLock.unlock()
 
-            session.startRunning()
-            let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("lump_voice_\(UUID().uuidString).m4a")
-            output.startRecording(to: tmp, outputFileType: .m4a, recordingDelegate: self)
-
-            captureSession = session
-            fileOutput = output
-            recordingURL = tmp
-            isRecording = true
-            micButton.isRecording = true
-            updateBadge()
-
-            levelTimer?.invalidate()
-            levelTimer = Timer.scheduledTimer(withTimeInterval: 0.06, repeats: true) { [weak self] _ in
-                self?.updateLevelMeter()
+                if let chData = buffer.floatChannelData?[0] {
+                    let frames = Int(buffer.frameLength)
+                    var sum: Float = 0
+                    for i in 0..<frames { sum += chData[i] * chData[i] }
+                    let rms = sqrt(sum / max(1, Float(frames)))
+                    let db = 20.0 * log10(max(rms, 1e-5))
+                    let norm = CGFloat(max(0.0, min(1.0, (Double(db) + 55.0) / 55.0)))
+                    DispatchQueue.main.async {
+                        if self.isRecording {
+                            self.window.contentView?.layer?.borderWidth = 1.8 + norm * 3.5
+                            self.window.contentView?.layer?.borderColor = NSColor(
+                                calibratedRed: 0.95,
+                                green: 0.25 + norm * 0.35,
+                                blue: 0.28 + norm * 0.25,
+                                alpha: 0.55 + norm * 0.45
+                            ).cgColor
+                        }
+                    }
+                }
             }
+
+            engine.prepare()
+            try engine.start()
+            self.audioEngine = engine
+            self.recordingURL = tmp
+            self.isRecording = true
+            self.micButton.isRecording = true
+            self.updateBadge()
         } catch {
-            NSLog("LumpDesk: failed to start recording: \(error)")
+            NSLog("LumpDesk: AVAudioEngine failed to start: \(error)")
         }
     }
 
-    private func updateLevelMeter() {
-        guard let conn = fileOutput?.connection(with: .audio),
-              let ch = conn.audioChannels.first else { return }
-        // Pulse the prism rim brightness & thickness subtly with your voice level
-        let db = max(-55.0, min(0.0, Double(ch.averagePowerLevel)))
-        let norm = CGFloat((db + 55.0) / 55.0)
-        self.window.contentView?.layer?.borderWidth = 1.8 + norm * 3.2
-        self.window.contentView?.layer?.borderColor = NSColor(
-            calibratedRed: 0.95,
-            green: 0.25 + norm * 0.35,
-            blue: 0.28 + norm * 0.25,
-            alpha: 0.55 + norm * 0.45
-        ).cgColor
-    }
-
     private func stopAndSendRecording() {
-        levelTimer?.invalidate()
-        levelTimer = nil
         isRecording = false
         micButton.isRecording = false
         voiceState = "transcribing"
         updateBadge()
-        fileOutput?.stopRecording()
+
+        audioEngine?.inputNode.removeTap(onBus: 0)
+        audioEngine?.stop()
+        audioEngine = nil
+
+        audioFileLock.lock()
+        audioFile = nil
+        audioFileLock.unlock()
+
+        guard let outputFileURL = recordingURL else {
+            voiceState = "idle"
+            updateBadge()
+            return
+        }
+        recordingURL = nil
+
+        guard let data = try? Data(contentsOf: outputFileURL), data.count > 2000 else {
+            try? FileManager.default.removeItem(at: outputFileURL)
+            voiceState = "idle"
+            updateBadge()
+            return
+        }
+        try? FileManager.default.removeItem(at: outputFileURL)
+
+        let mode = recordingMode
+        let path = mode == "dictate" ? "/transcribe" : "/transcribe_and_run"
+        guard let endpoint = URL(string: "\(VOICE_BASE)\(path)") else { return }
+        var req = URLRequest(url: endpoint)
+        req.httpMethod = "POST"
+        req.setValue("audio/wav", forHTTPHeaderField: "Content-Type")
+        req.httpBody = data
+        URLSession.shared.dataTask(with: req) { [weak self] respData, _, _ in
+            guard let self = self else { return }
+            if mode == "dictate" {
+                if let respData = respData,
+                   let obj = try? JSONSerialization.jsonObject(with: respData) as? [String: Any],
+                   let text = (obj["text"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !text.isEmpty {
+                    self.lastTranscript = text
+                    DispatchQueue.main.async {
+                        self.pasteTextIntoActiveApp(text)
+                    }
+                }
+                self.voiceState = "idle"
+                self.updateBadge()
+            }
+        }.resume()
     }
 
     private func pasteTextIntoActiveApp(_ text: String) {
@@ -766,43 +860,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         }
     }
 
-    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
-        captureSession?.stopRunning()
-        captureSession = nil
-        fileOutput = nil
-
-        guard let data = try? Data(contentsOf: outputFileURL), data.count > 1000 else {
-            try? FileManager.default.removeItem(at: outputFileURL)
-            voiceState = "idle"
-            updateBadge()
-            return
-        }
-        try? FileManager.default.removeItem(at: outputFileURL)
-
-        let mode = recordingMode
-        let path = mode == "dictate" ? "/transcribe" : "/transcribe_and_run"
-        guard let endpoint = URL(string: "\(VOICE_BASE)\(path)") else { return }
-        var req = URLRequest(url: endpoint)
-        req.httpMethod = "POST"
-        req.setValue("audio/mp4", forHTTPHeaderField: "Content-Type")
-        req.httpBody = data
-        URLSession.shared.dataTask(with: req) { [weak self] respData, _, _ in
-            guard let self = self else { return }
-            if mode == "dictate" {
-                if let respData = respData,
-                   let obj = try? JSONSerialization.jsonObject(with: respData) as? [String: Any],
-                   let text = (obj["text"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !text.isEmpty {
-                    self.lastTranscript = text
-                    DispatchQueue.main.async {
-                        self.pasteTextIntoActiveApp(text)
-                    }
-                }
-                self.voiceState = "idle"
-                self.updateBadge()
-            }
-        }.resume()
-    }
+    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {}
 
     // MARK: - Actions & Menu
 
