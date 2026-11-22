@@ -170,11 +170,13 @@ class VoiceCoordinator:
                 pass
 
     def speak(self, text: str, voice_override: str | None = None, speed_override: float | None = None) -> None:
+        cfg = read_config()
+        if cfg.get("tts_enabled") is False and not voice_override:
+            return
         spoken = clean_for_speech(text)
         if not spoken:
             return
         self.stop_speaking()
-        cfg = read_config()
         engine = (cfg.get("tts_engine") or DEFAULT_TTS_ENGINE).lower()
         # Allow explicit Kokoro voice override (e.g. bf_emma) or Edge voice override (e.g. en-GB-SoniaNeural)
         if voice_override and "Neural" in voice_override:
