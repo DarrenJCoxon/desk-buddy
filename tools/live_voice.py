@@ -52,6 +52,32 @@ def post_hook(ev: str, sid: str = "lump-live"):
         pass
 
 
+def load_pa_context() -> str:
+    """Load current PA snapshot (today.md + meetings.json) so Live Voice answers schedule/task questions instantly."""
+    parts = []
+    today_path = os.path.join(PA_DIR, "today.md")
+    if os.path.isfile(today_path):
+        try:
+            parts.append("=== TODAY & WEEK AHEAD (today.md) ===\n" + open(today_path, encoding="utf-8").read()[:4000])
+        except OSError:
+            pass
+    mtg_path = os.path.join(HOME, "meetings.json")
+    if os.path.isfile(mtg_path):
+        try:
+            ms = json.load(open(mtg_path, encoding="utf-8"))
+            now = time.time()
+            upcoming = [m for m in ms if (m.get("end") or m.get("start", 0) + 3600) > now - 600][:10]
+            if upcoming:
+                lines = [
+                    f"- {time.strftime('%a %d %b %H:%M', time.localtime(m['start']))}: {m.get('summary') or m.get('title')}"
+                    for m in upcoming
+                ]
+                parts.append("=== UPCOMING CALENDAR EVENTS (meetings.json) ===\n" + "\n".join(lines))
+        except Exception:
+            pass
+    return "\n\n".join(parts)
+
+
 def run_antigravity_task(instruction: str) -> str:
     """Delegate real PA / coding actions to Antigravity CLI (`agy --mode auto`)."""
     cli = (
@@ -64,8 +90,13 @@ def run_antigravity_task(instruction: str) -> str:
     post_hook("UserPromptSubmit")
     try:
         os.makedirs(PA_DIR, exist_ok=True)
+        enriched = (
+            f"Darren's PA files are in {PA_DIR} (today.md, inbox.md, meetings/, prep/) "
+            f"and synced calendar events are in {os.path.join(HOME, 'meetings.json')}.\n\n"
+            f"Task: {instruction}"
+        )
         proc = subprocess.run(
-            [cli, "--mode", "auto", "--effort", "low", "-p", instruction],
+            [cli, "--mode", "auto", "--effort", "low", "-p", enriched],
             cwd=PA_DIR,
             capture_output=True,
             text=True,
@@ -125,6 +156,17 @@ async def run_live_session():
         )
     ]
 
+    pa_snapshot = load_pa_context()
+    sys_text = (
+        "You are Lump, Darren's warm, sharp, conversational Executive PA living on his desk. "
+        f"Current local time: {time.strftime('%A %d %B %Y, %H:%M')}. "
+        "Speak naturally and concisely like a real human colleague. "
+        "You already have Darren's current schedule, watch-outs, and priorities below — answer schedule and task questions immediately from it. "
+        "Whenever Darren asks you to open an app/URL/file, update today.md or inbox.md, create a prep sheet in prep/, "
+        "or run a coding/CI task, call the `run_pa_task` tool and tell him briefly while you do it.\n\n"
+        + pa_snapshot
+    )
+
     live_cfg = types.LiveConnectConfig(
         response_modalities=[types.Modality.AUDIO],
         speech_config=types.SpeechConfig(
@@ -133,17 +175,7 @@ async def run_live_session():
             )
         ),
         system_instruction=types.Content(
-            parts=[
-                types.Part.from_text(
-                    text=(
-                        "You are Lump, Darren's warm, sharp, conversational Executive PA living on his desk. "
-                        "Speak naturally and concisely like a real human colleague. "
-                        "Whenever Darren asks you to open something, check calendar/email, prep a meeting or training, "
-                        "update today.md, or run a coding task, immediately call the `run_pa_task` tool and tell him briefly "
-                        "while you do it."
-                    )
-                )
-            ]
+            parts=[types.Part.from_text(text=sys_text)]
         ),
         tools=tools,
     )
