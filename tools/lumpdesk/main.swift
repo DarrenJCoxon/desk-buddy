@@ -118,6 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
     private var lastTranscript = ""
     private var lastReply = ""
     private var voiceState = "idle"
+    private var liveVoiceActive = false
     private var currentColourHex = "4285F4"
     private var cachedIconHex = ""
     private var cachedMenuIcon: NSImage?
@@ -280,13 +281,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         levelBarBg.addSubview(levelBarFill)
         container.addSubview(levelBarBg)
 
-        // Mic button (bottom-right)
+        // Mic button (bottom-right) -> toggles hands-free Gemini Live Voice
         let btnSize: CGFloat = 34
         micButton = MicButton(frame: NSRect(x: rect.width - btnSize - 10, y: 10, width: btnSize, height: btnSize))
         micButton.autoresizingMask = [.minXMargin, .maxYMargin]
         micButton.target = self
-        micButton.action = #selector(toggleRecording)
-        micButton.toolTip = "Click or double-tap ⌥ Option to talk to Lump (again to send)"
+        micButton.action = #selector(toggleLiveVoice)
+        micButton.toolTip = "Click to toggle Live Voice (or double-tap ⌥ Option to dictate)"
         container.addSubview(micButton)
 
         window.contentView = container
@@ -474,6 +475,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
             btn.contentTintColor = .systemRed
             notchIconView?.image = img
             notchIconView?.contentTintColor = .systemRed
+        } else if liveVoiceActive {
+            let img = NSImage(systemSymbolName: "waveform.circle.fill", accessibilityDescription: "Lump Live Voice")
+            img?.isTemplate = false
+            btn.image = img
+            btn.contentTintColor = .systemGreen
+            notchIconView?.image = img
+            notchIconView?.contentTintColor = .systemGreen
         } else if meetingRecorder.isActive {
             let img = NSImage(systemSymbolName: "waveform.circle.fill", accessibilityDescription: "Lump Recording Meeting")
             img?.isTemplate = false
@@ -597,20 +605,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
                 self.setVoiceMood("awake")
                 self.window.contentView?.layer?.borderColor = NSColor(calibratedRed: 0.95, green: 0.28, blue: 0.30, alpha: 0.85).cgColor
                 self.window.contentView?.layer?.borderWidth = 2.0
+            } else if self.liveVoiceActive {
+                self.setVoiceMood("awake")
+                self.micButton.isRecording = true
+                self.window.contentView?.layer?.borderColor = NSColor(calibratedRed: 0.16, green: 0.78, blue: 0.52, alpha: 0.90).cgColor
+                self.window.contentView?.layer?.borderWidth = 2.5
             } else if self.meetingRecorder.isActive {
                 self.setVoiceMood("working")
+                self.micButton.isRecording = false
                 self.window.contentView?.layer?.borderColor = NSColor(calibratedRed: 0.65, green: 0.32, blue: 0.96, alpha: 0.85).cgColor
                 self.window.contentView?.layer?.borderWidth = 2.5
             } else if self.voiceState == "transcribing" || self.voiceState == "working" {
                 self.setVoiceMood("working")
+                self.micButton.isRecording = false
                 self.window.contentView?.layer?.borderColor = NSColor(calibratedRed: 0.26, green: 0.52, blue: 0.96, alpha: 0.70).cgColor
                 self.window.contentView?.layer?.borderWidth = 2.0
             } else if self.voiceState == "speaking" {
                 self.setVoiceMood("done")
+                self.micButton.isRecording = false
                 self.window.contentView?.layer?.borderColor = NSColor(calibratedRed: 0.16, green: 0.75, blue: 0.50, alpha: 0.75).cgColor
                 self.window.contentView?.layer?.borderWidth = 2.0
             } else {
                 self.setVoiceMood(nil)
+                self.micButton.isRecording = false
                 self.window.contentView?.layer?.borderColor = NSColor(white: 1.0, alpha: 0.16).cgColor
                 self.window.contentView?.layer?.borderWidth = 1.5
             }
@@ -625,6 +642,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
             self.voiceState = (obj["state"] as? String) ?? "idle"
             self.lastTranscript = (obj["last_transcript"] as? String) ?? ""
             self.lastReply = (obj["last_reply"] as? String) ?? ""
+            if let live = obj["live_voice"] as? [String: Any] {
+                self.liveVoiceActive = (live["active"] as? Bool) ?? false
+            }
             self.updateBadge()
         }.resume()
     }
@@ -877,6 +897,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
         }
     }
 
+    @objc func toggleLiveVoice() {
+        postSimple("\(VOICE_BASE)/api/live/toggle")
+        liveVoiceActive.toggle()
+        updateBadge()
+    }
+
     @objc func toggleMeetingRecording() {
         if meetingRecorder.isActive {
             meetingRecorder.stop()
@@ -945,9 +971,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVCaptureFileOutputRec
 
     func buildContextMenu() -> NSMenu {
         let menu = NSMenu()
+        menu.addItem(withTitle: liveVoiceActive ? "End Live Voice" : "Start Live Voice (Hands-Free)", action: #selector(toggleLiveVoice), keyEquivalent: "")
         menu.addItem(withTitle: "Open Lump Nerve Centre", action: #selector(openNerveCentre), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: isRecording ? "Stop Recording (⌥ ⌥)" : "Dictate into Active App (⌥ ⌥)", action: #selector(toggleDictation), keyEquivalent: "")
+        menu.addItem(withTitle: isRecording ? "Stop Dictation (⌥ ⌥)" : "Dictate into Active App (⌥ ⌥)", action: #selector(toggleDictation), keyEquivalent: "")
         menu.addItem(withTitle: "Ask Lump Agent", action: #selector(toggleRecording), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: meetingRecorder.isActive ? "Stop Meeting Notes & Summarize" : "Start Meeting Notes (Dual-Track)", action: #selector(toggleMeetingRecording), keyEquivalent: "")
